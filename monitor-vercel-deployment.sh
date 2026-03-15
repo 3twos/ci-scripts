@@ -23,6 +23,7 @@ Modes:
 Options:
   -i, --interval <seconds>     Poll interval in seconds (default: 10)
   --timeout <seconds>          Optional script timeout (default: 0, disabled)
+  --repo <path>                Repo path — reads .vercel/project.json for project-id & team-id
   --project-id <id>            Project id for project watcher mode
   --project-name <name>        Short name used in spoken alerts
   --team-id <id>               Team/org id (default: $VERCEL_TEAM_ID or $VERCEL_ORG_ID)
@@ -37,8 +38,11 @@ Options:
   -h, --help                   Show help
 
 Examples:
-  # Watch production deployments for a project until Ctrl+C
-  VERCEL_TOKEN=... VERCEL_PROJECT_ID=... monitor-vercel-deployment.sh --project-name "my-app" --interval 5
+  # Watch production deployments using a repo's .vercel/project.json
+  monitor-vercel-deployment.sh --repo ~/dev/my-app --interval 5
+
+  # Watch production deployments by project id
+  VERCEL_TOKEN=... monitor-vercel-deployment.sh --project-id prj_xxx --project-name "my-app"
 
   # Watch one deployment continuously until Ctrl+C
   monitor-vercel-deployment.sh dpl_123abc --interval 5
@@ -2809,6 +2813,7 @@ TIMEOUT_SECONDS=0
 TEAM_ID="${VERCEL_TEAM_ID:-${VERCEL_ORG_ID:-}}"
 PROJECT_ID="${VERCEL_PROJECT_ID:-}"
 PROJECT_SHORT_NAME="${VERCEL_PROJECT_SHORT_NAME:-}"
+REPO_PATH=""
 TOKEN="${VERCEL_TOKEN:-}"
 TOKEN_FROM_ARG=0
 ENABLE_SPEAK=1
@@ -2850,6 +2855,14 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       TIMEOUT_SECONDS="$2"
+      shift 2
+      ;;
+    --repo)
+      if [[ $# -lt 2 ]]; then
+        print_error "$1 requires a value."
+        exit 1
+      fi
+      REPO_PATH="$2"
       shift 2
       ;;
     --project-id)
@@ -2993,6 +3006,24 @@ if [[ -n "$TARGET_FILTER" && "$TARGET_FILTER" != "production" ]]; then
     print_error "--target must be: production."
   fi
   exit 1
+fi
+
+# Resolve --repo: read .vercel/project.json for projectId and orgId
+if [[ -n "${REPO_PATH:-}" ]]; then
+  VERCEL_JSON="${REPO_PATH}/.vercel/project.json"
+  if [[ ! -f "$VERCEL_JSON" ]]; then
+    print_error "No .vercel/project.json found at '${REPO_PATH}'. Run 'vercel link' in that repo first."
+    exit 1
+  fi
+  if [[ -z "$PROJECT_ID" ]]; then
+    PROJECT_ID="$(node -e "const p=require('${VERCEL_JSON}'); process.stdout.write(p.projectId||'')" 2>/dev/null)"
+  fi
+  if [[ -z "$TEAM_ID" ]]; then
+    TEAM_ID="$(node -e "const p=require('${VERCEL_JSON}'); process.stdout.write(p.orgId||'')" 2>/dev/null)"
+  fi
+  if [[ -z "$PROJECT_SHORT_NAME" ]]; then
+    PROJECT_SHORT_NAME="$(node -e "const p=require('${VERCEL_JSON}'); process.stdout.write(p.projectName||'')" 2>/dev/null)"
+  fi
 fi
 
 WATCH_MODE="deployment"
