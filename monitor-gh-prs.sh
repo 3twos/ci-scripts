@@ -903,10 +903,8 @@ render_dashboard() {
   fi
 
   print_dashboard_line ""
-  print_dashboard_linef 'Last Event : %s' "${LAST_EVENT_MESSAGE:-Starting...}"
-  print_dashboard_linef 'Event Time : %s' "$event_time_display"
-  print_dashboard_linef 'Last Alert : %s %s' "$alert_mark" "${LAST_ALERT_MESSAGE:-None}"
-  print_dashboard_linef 'Alert Time : %s' "$alert_time_display"
+  print_dashboard_linef 'Last Event : %s  %s' "$event_time_display" "${LAST_EVENT_MESSAGE:-Starting...}"
+  print_dashboard_linef 'Last Alert : %s %s  %s' "$alert_mark" "$alert_time_display" "${LAST_ALERT_MESSAGE:-None}"
 
   end_dashboard_render
 }
