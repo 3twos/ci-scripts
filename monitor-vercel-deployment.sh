@@ -196,7 +196,7 @@ const commitSha = sanitize(pick(
   payload?.meta?.commitSha,
   payload?.meta?.commit,
 ));
-const changeTitle = sanitize(pick(
+const changeTitleRaw = pick(
   payload?.meta?.githubPullRequestTitle,
   payload?.meta?.gitlabMergeRequestTitle,
   payload?.meta?.pullRequestTitle,
@@ -208,7 +208,8 @@ const changeTitle = sanitize(pick(
   payload?.meta?.gitCommitMessage,
   payload?.meta?.commitMessage,
   payload?.meta?.message,
-));
+);
+const changeTitle = sanitize(changeTitleRaw.split(/[\n\r]/)[0] || "");
 const pullRequest = sanitize(pick(
   payload?.meta?.githubPullRequestNumber,
   payload?.meta?.githubPullRequestId,
@@ -325,7 +326,7 @@ for (const item of deployments) {
     item?.meta?.commitSha,
     item?.meta?.commit,
   ));
-  const changeTitle = sanitize(pick(
+  const changeTitleRaw = pick(
     item?.meta?.githubPullRequestTitle,
     item?.meta?.gitlabMergeRequestTitle,
     item?.meta?.pullRequestTitle,
@@ -337,7 +338,8 @@ for (const item of deployments) {
     item?.meta?.gitCommitMessage,
     item?.meta?.commitMessage,
     item?.meta?.message,
-  ));
+  );
+  const changeTitle = sanitize(changeTitleRaw.split(/[\n\r]/)[0] || "");
   const pullRequest = sanitize(pick(
     item?.meta?.githubPullRequestNumber,
     item?.meta?.githubPullRequestId,
@@ -998,9 +1000,6 @@ friendly_change_title() {
     printf '%s' "n/a"
     return
   fi
-
-  # Strip commit body after first * or newline (sanitized to space)
-  title="${title%% \* *}"
 
   lowered="$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]')"
   case "$lowered" in
