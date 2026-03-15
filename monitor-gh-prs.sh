@@ -342,7 +342,8 @@ reconcile_pr_list() {
   done
 
   # Remove PRs no longer in the list (closed/merged)
-  local keep_indices=()
+  local keep_indices_str=""
+  local keep_count=0
   for (( i = 0; i < ${#PR_NUMBERS[@]}; i++ )); do
     found=0
     for (( j = 0; j < ${#FETCHED_PR_NUMBERS[@]}; j++ )); do
@@ -352,20 +353,21 @@ reconcile_pr_list() {
       fi
     done
     if (( found == 1 )); then
-      keep_indices+=("$i")
+      keep_indices_str="${keep_indices_str:+${keep_indices_str} }${i}"
+      keep_count=$(( keep_count + 1 ))
     else
       log_line "PR #${PR_NUMBERS[i]} no longer open (closed/merged)."
     fi
   done
 
-  if (( ${#keep_indices[@]} < ${#PR_NUMBERS[@]} )); then
+  if (( keep_count < ${#PR_NUMBERS[@]} )); then
     local tmp_numbers=() tmp_titles=() tmp_authors=() tmp_branches=() tmp_urls=() tmp_draft=()
     local tmp_mergeable=() tmp_merge_state=() tmp_ci=() tmp_review_dec=() tmp_review_state=() tmp_review_cnt=() tmp_reviewers=() tmp_ready=()
     local tmp_prev_m=() tmp_prev_ms=() tmp_prev_ci=() tmp_prev_rd=() tmp_prev_rs=() tmp_prev_rc=() tmp_prev_rdy=()
     local tmp_issue_since=() tmp_ann_still=()
     local tmp_ann_c=() tmp_ann_conf=() tmp_ann_ci=() tmp_ann_nr=() tmp_ann_rdy=()
 
-    for idx in "${keep_indices[@]}"; do
+    for idx in $keep_indices_str; do
       tmp_numbers+=("${PR_NUMBERS[idx]}")
       tmp_titles+=("${PR_TITLES[idx]}")
       tmp_authors+=("${PR_AUTHORS[idx]}")
