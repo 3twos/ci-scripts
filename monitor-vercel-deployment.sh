@@ -1065,7 +1065,7 @@ deployment_change_label() {
 
   title_label="$(friendly_change_title "$change_title")"
   if [[ "$title_label" != "n/a" ]]; then
-    printf '%s' "$(truncate_text "$title_label" 48)"
+    printf '%s' "$title_label"
     return
   fi
 
@@ -1078,7 +1078,7 @@ deployment_change_label() {
     return
   fi
 
-  printf '%s' "$(truncate_text "$branch_label" 48)"
+  printf '%s' "$branch_label"
 }
 
 branch_context_hint() {
@@ -2710,7 +2710,7 @@ render_dashboard() {
       if [[ -z "$title_raw" ]]; then
         title_raw="$(deployment_identity_label "${DEP_BRANCH[i]:-}" "${DEP_TARGET[i]:-preview}" "${DEP_URL[i]:-}" "${DEP_PULL_REQUEST[i]:-}" "${DEP_COMMIT_SHA[i]:-}" "${DEP_SOURCE[i]:-}" "${DEP_ACTOR[i]:-}")"
       fi
-      title_raw="$(truncate_text "$title_raw" 90)"
+      title_raw="$(truncate_text "$title_raw" 120)"
 
       duration_seconds="$(duration_seconds_for_record "${DEP_CREATED_AT_MS[i]:-}" "${DEP_READY_AT_MS[i]:-}" "${DEP_FIRST_SEEN_EPOCH[i]:-$now_seconds}")"
       duration_text="$(format_duration "$duration_seconds")"
@@ -2722,7 +2722,7 @@ render_dashboard() {
         status_label="$(friendly_status "$status")"
 
         print_dashboard_linef '%s %s  %s  %s%s%s' \
-          "$env_mark" "$(color_pad "$status_label" 12)" "$(color_pad "$title_raw" 90)" \
+          "$env_mark" "$(color_pad "$status_label" 12)" "$(color_pad "$title_raw" 120)" \
           "${C_DIM}" "$duration_text" "${C_RESET}"
 
         step_label="$(deployment_step_label "$i")"
@@ -2735,7 +2735,7 @@ render_dashboard() {
         started_relative="$(relative_time_from_ms "${DEP_CREATED_AT_MS[i]:-}")"
 
         print_dashboard_linef '  %s  %s  %s%6s  %s%s' \
-          "$row_icon" "$(color_pad "$title_raw" 90)" \
+          "$row_icon" "$(color_pad "$title_raw" 120)" \
           "${C_DIM}" "$duration_text" "$started_relative" "${C_RESET}"
 
         error_text="$(sanitize_field "${DEP_ERROR_MESSAGE[i]:-}")"
@@ -2756,7 +2756,7 @@ render_dashboard() {
         row_icon="$(status_icon "$status")"
         started_time_label="$(format_ms_local "${DEP_CREATED_AT_MS[i]:-}")"
         old_title="$(deployment_change_label "${DEP_CHANGE_TITLE[i]:-}" "${DEP_BRANCH[i]:-}" "${DEP_TARGET[i]:-preview}" "${DEP_URL[i]:-}")"
-        old_title="$(truncate_text "$old_title" 56)"
+        old_title="$(truncate_text "$old_title" 90)"
 
         duration_seconds="$(duration_seconds_for_record "${DEP_CREATED_AT_MS[i]:-}" "${DEP_READY_AT_MS[i]:-}" "${DEP_FIRST_SEEN_EPOCH[i]:-$now_seconds}")"
         duration_text="$(format_duration "$duration_seconds")"
@@ -2766,12 +2766,12 @@ render_dashboard() {
           old_error="$(truncate_text "$old_error" 40)"
           print_dashboard_linef '  %s  %s%s%s  %s  %s%6s  %s%s%s' \
             "$row_icon" "${C_DIM}" "$started_time_label" "${C_RESET}" \
-            "$(color_pad "$old_title" 56)" \
+            "$(color_pad "$old_title" 90)" \
             "${C_DIM}" "$duration_text" "${C_RED}${old_error}" "${C_RESET}" ""
         else
           print_dashboard_linef '  %s  %s%s%s  %s  %s%6s%s' \
             "$row_icon" "${C_DIM}" "$started_time_label" "${C_RESET}" \
-            "$(color_pad "$old_title" 56)" \
+            "$(color_pad "$old_title" 90)" \
             "${C_DIM}" "$duration_text" "${C_RESET}"
         fi
       done
