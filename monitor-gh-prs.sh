@@ -555,10 +555,17 @@ process_pr_transitions_and_alerts() {
             fi
           done
         fi
+        local new_count=$(( PR_REVIEW_COUNT[i] - PR_PREV_REVIEW_COUNT[i] ))
+        local count_suffix=""
+        if (( new_count == 1 )); then
+          count_suffix=", 1 comment"
+        elif (( new_count > 1 )); then
+          count_suffix=", ${new_count} comments"
+        fi
         if [[ -n "$voice_names" ]]; then
-          msg="${num} has new reviews from ${voice_names}"
+          msg="${num} has new reviews from ${voice_names}${count_suffix}"
         else
-          msg="${num} has new reviews"
+          msg="${num} has new reviews${count_suffix}"
         fi
         log_line "$msg"
         LAST_ALERT_MESSAGE="$msg"
