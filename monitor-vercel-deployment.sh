@@ -2783,6 +2783,7 @@ render_dashboard() {
 }
 
 cleanup_runtime() {
+  _dashboard_leave_alt_screen
   stop_all_event_stream_workers
   cleanup_audio_runtime
 }

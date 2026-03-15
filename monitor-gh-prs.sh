@@ -933,6 +933,7 @@ render_plain_cycle_summary() {
 # ---------------------------------------------------------------------------
 
 cleanup_runtime() {
+  _dashboard_leave_alt_screen
   cleanup_audio_runtime
 }
 

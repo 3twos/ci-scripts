@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/monitor-core.sh"
+source "${SCRIPT_DIR}/lib/monitor-dashboard.sh"
 
 usage() {
   cat <<'HELP'
@@ -793,7 +794,7 @@ render_dashboard() {
   event_time_display="$(format_epoch_with_relative "$LAST_EVENT_EPOCH")"
   alert_time_display="$(format_epoch_with_relative "$LAST_ALERT_EPOCH")"
 
-  printf '\033[H\033[2J'
+  begin_dashboard_render
   printf '%sCI Timing Monitor%s\n' "${C_BOLD_CYAN}" "${C_RESET}"
   printf '=================\n'
   printf 'Repo         : %s\n' "$REPO_SLUG"
@@ -1163,7 +1164,8 @@ LAST_ALERT_EPOCH="$(date +%s)"
 log_line "Monitoring CI timings for repo=${REPO_SLUG} workflow=${WORKFLOW_INPUT} branch=${BRANCH} (interval=${INTERVAL_SECONDS}s)"
 log_line "Baseline comparison: branch=${BASELINE_BRANCH} event=${BASELINE_EVENT} threshold=${REGRESSION_THRESHOLD}%"
 
-trap 'warn_line "Stopped CI timing monitor."; exit 0' INT TERM
+trap '_dashboard_leave_alt_screen; warn_line "Stopped CI timing monitor."; exit 0' INT TERM
+trap '_dashboard_leave_alt_screen' EXIT
 
 START_EPOCH="$(date +%s)"
 
