@@ -816,18 +816,18 @@ pr_status_label() {
   if [[ "$draft" == "1" ]]; then printf '%s' "${C_DIM}DRAFT${C_RESET}"; return; fi
   if (( ready == 1 )); then printf '%s' "${C_BOLD_GREEN}READY${C_RESET}"; return; fi
   if [[ "$mergeable" == "CONFLICTING" ]]; then printf '%s' "${C_BOLD_RED}CONFLICT${C_RESET}"; return; fi
-  if [[ "$ci" == "failing" ]]; then printf '%s' "${C_RED}CI FAIL${C_RESET}"; return; fi
-  if [[ "$merge_state" == "BEHIND" ]]; then printf '%s' "${C_YELLOW}BEHIND${C_RESET}"; return; fi
-  if [[ "$merge_state" == "BLOCKED" ]]; then printf '%s' "${C_YELLOW}BLOCKED${C_RESET}"; return; fi
-  if [[ "$ci" == "pending" ]]; then printf '%s' "${C_BLUE}PENDING${C_RESET}"; return; fi
-  printf '%s' "${C_CYAN}OPEN${C_RESET}"
+  if [[ "$ci" == "failing" ]]; then printf '%s' "${C_BOLD_RED}CI FAIL${C_RESET}"; return; fi
+  if [[ "$merge_state" == "BEHIND" ]]; then printf '%s' "${C_BOLD_YELLOW}BEHIND${C_RESET}"; return; fi
+  if [[ "$merge_state" == "BLOCKED" ]]; then printf '%s' "${C_BOLD_YELLOW}BLOCKED${C_RESET}"; return; fi
+  if [[ "$ci" == "pending" ]]; then printf '%s' "${C_BOLD_BLUE}PENDING${C_RESET}"; return; fi
+  printf '%s' "${C_BOLD_CYAN}OPEN${C_RESET}"
 }
 
 ci_icon() {
   case "$1" in
-    passing) printf '%s' "${C_GREEN}✓${C_RESET}" ;;
-    failing) printf '%s' "${C_RED}✗${C_RESET}" ;;
-    pending) printf '%s' "${C_YELLOW}◑${C_RESET}" ;;
+    passing) printf '%s' "${C_BOLD_GREEN}✓${C_RESET}" ;;
+    failing) printf '%s' "${C_BOLD_RED}✗${C_RESET}" ;;
+    pending) printf '%s' "${C_BOLD_YELLOW}◑${C_RESET}" ;;
     none)    printf '%s' "${C_DIM}—${C_RESET}" ;;
     *)       printf '%s' "?" ;;
   esac
@@ -835,13 +835,13 @@ ci_icon() {
 
 merge_label() {
   local mergeable="$1" merge_state="$2"
-  if [[ "$mergeable" == "CONFLICTING" ]]; then printf '%s' "${C_RED}conflict${C_RESET}"; return; fi
+  if [[ "$mergeable" == "CONFLICTING" ]]; then printf '%s' "${C_BOLD_RED}conflict${C_RESET}"; return; fi
   case "$merge_state" in
-    CLEAN)    printf '%s' "${C_GREEN}clean${C_RESET}" ;;
-    BEHIND)   printf '%s' "${C_YELLOW}behind${C_RESET}" ;;
-    BLOCKED)  printf '%s' "${C_YELLOW}blocked${C_RESET}" ;;
-    DIRTY)    printf '%s' "${C_RED}dirty${C_RESET}" ;;
-    UNSTABLE) printf '%s' "${C_YELLOW}unstable${C_RESET}" ;;
+    CLEAN)    printf '%s' "${C_BOLD_GREEN}clean${C_RESET}" ;;
+    BEHIND)   printf '%s' "${C_BOLD_YELLOW}behind${C_RESET}" ;;
+    BLOCKED)  printf '%s' "${C_BOLD_YELLOW}blocked${C_RESET}" ;;
+    DIRTY)    printf '%s' "${C_BOLD_RED}dirty${C_RESET}" ;;
+    UNSTABLE) printf '%s' "${C_BOLD_YELLOW}unstable${C_RESET}" ;;
     UNKNOWN)  printf '%s' "${C_DIM}?${C_RESET}" ;;
     *)        printf '%s' "$merge_state" | tr '[:upper:]' '[:lower:]' ;;
   esac
@@ -849,9 +849,9 @@ merge_label() {
 
 review_label() {
   case "$1" in
-    approved) printf '%s' "${C_GREEN}approved${C_RESET}" ;;
-    changes)  printf '%s' "${C_YELLOW}changes${C_RESET}" ;;
-    pending)  printf '%s' "${C_BLUE}pending${C_RESET}" ;;
+    approved) printf '%s' "${C_BOLD_GREEN}approved${C_RESET}" ;;
+    changes)  printf '%s' "${C_BOLD_YELLOW}changes${C_RESET}" ;;
+    pending)  printf '%s' "${C_BOLD_BLUE}pending${C_RESET}" ;;
     none)     printf '%s' "${C_BOLD_YELLOW}none${C_RESET}" ;;
     *)        printf '%s' "${C_DIM}—${C_RESET}" ;;
   esac
