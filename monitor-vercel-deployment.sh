@@ -999,6 +999,9 @@ friendly_change_title() {
     return
   fi
 
+  # Strip commit body after first * or newline (sanitized to space)
+  title="${title%% \* *}"
+
   lowered="$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]')"
   case "$lowered" in
     n/a|na|none|null|unknown|unlabeled)
