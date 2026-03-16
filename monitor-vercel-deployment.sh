@@ -2649,136 +2649,153 @@ _render_active_steps() {
   done
 }
 
+_build_title_for_deployment() {
+  local i="$1"
+  local change_title_label pr_display title_raw
+
+  change_title_label="$(deployment_change_label "${DEP_CHANGE_TITLE[i]:-}" "${DEP_BRANCH[i]:-}" "${DEP_TARGET[i]:-preview}" "${DEP_URL[i]:-}")"
+  pr_display="$(pull_request_display_label "$(sanitize_field "${DEP_PULL_REQUEST[i]:-}")")"
+
+  title_raw=""
+  if [[ "$pr_display" != "n/a" ]]; then
+    title_raw="${pr_display} "
+  fi
+  if [[ "$change_title_label" != "n/a" ]]; then
+    title_raw="${title_raw}${change_title_label}"
+  fi
+  if [[ -z "$title_raw" ]]; then
+    title_raw="$(deployment_identity_label "${DEP_BRANCH[i]:-}" "${DEP_TARGET[i]:-preview}" "${DEP_URL[i]:-}" "${DEP_PULL_REQUEST[i]:-}" "${DEP_COMMIT_SHA[i]:-}" "${DEP_SOURCE[i]:-}" "${DEP_ACTOR[i]:-}")"
+  fi
+
+  printf '%s' "$title_raw"
+}
+
+_render_inline_progress() {
+  local status="$1"
+  local step_text="$2"
+  local step_history="$3"
+  local now_seconds="$4"
+
+  local phases=("Q" "I" "C" "Inst" "Build" "Dep")
+  local phase_names=("queue" "init" "clone" "install" "build" "deploy")
+  local current_idx
+  current_idx="$(_current_phase_index "$status" "$step_text")"
+
+  # Parse step history
+  local phase_epochs=("" "" "" "" "" "")
+  if [[ -n "$step_history" ]]; then
+    local old_ifs="${IFS:-$' \t\n'}"
+    IFS='|'
+    local entry
+    for entry in $step_history; do
+      local entry_key="${entry%%:*}"
+      local entry_epoch="${entry##*:}"
+      local pidx
+      pidx="$(_step_phase_index "$entry_key")"
+      if (( pidx >= 0 && pidx < 6 )); then
+        phase_epochs[pidx]="$entry_epoch"
+      fi
+    done
+    IFS="$old_ifs"
+  fi
+
+  local p result="" phase_color timing_text
+  for (( p = 0; p < ${#phases[@]}; p++ )); do
+    if (( p < current_idx )); then
+      result="${result}${C_BOLD_GREEN}${phases[p]}${C_RESET} "
+    elif (( p == current_idx )); then
+      timing_text=""
+      if [[ -n "${phase_epochs[p]}" ]]; then
+        local elapsed=$(( now_seconds - phase_epochs[p] ))
+        if (( elapsed >= 0 )); then
+          timing_text=" $(format_duration "$elapsed")"
+        fi
+      fi
+      local spinner
+      spinner="$(spinner_frame)"
+      result="${result}${C_BOLD_YELLOW}${spinner} ${phases[p]}${timing_text}${C_RESET} "
+    else
+      result="${result}${C_DIM}${phases[p]}${C_RESET} "
+    fi
+  done
+
+  printf '%s' "$result"
+}
+
 render_dashboard() {
-  local status_mark
-  local i status step_label duration_seconds duration_text
-  local change_title_label error_text now_seconds
+  local i status duration_seconds duration_text
+  local error_text now_seconds title_raw
 
   if (( DASHBOARD_ENABLED == 0 )); then
     return
   fi
 
   now_seconds="$(date +%s)"
-  status_mark="$(status_icon "${DASH_STATUS_RAW:-UNKNOWN}")"
 
   begin_dashboard_render
 
   # ── Header ──
-  print_dashboard_linef '%s%s%s  %s  %s' \
+  print_dashboard_linef '%s%s%s  %s' \
     "${C_BOLD_CYAN}" "${DASH_PROJECT_NAME:-Vercel}" "${C_RESET}" \
-    "$status_mark" \
-    "${C_DIM}${DASH_UPDATED_AT_LABEL:-n/a}${C_RESET}"
-
-  # ── Alert banner (only when meaningful) ──
-  if [[ "${LAST_ALERT_MESSAGE:-None}" != "None" && "${LAST_ALERT_MESSAGE:-}" != "Starting..." ]]; then
-    local alert_age_display alert_mark_icon
-    alert_mark_icon="$(alert_icon "${LAST_ALERT_LEVEL:-info}")"
-    alert_age_display="$(format_epoch_with_relative "$LAST_ALERT_EPOCH")"
-    print_dashboard_linef '%s %s  %s' "$alert_mark_icon" "${LAST_ALERT_MESSAGE}" "${C_DIM}${alert_age_display}${C_RESET}"
-  fi
-
+    "${C_DIM}$(date '+%H:%M:%S')${C_RESET}"
   print_dashboard_line ""
 
   if (( ${#DEP_IDS[@]} == 0 )); then
-    print_dashboard_linef '%sWaiting for deployments...%s' "${C_DIM}" "${C_RESET}"
+    print_dashboard_linef '  %sWaiting for deployments...%s' "${C_DIM}" "${C_RESET}"
   else
-    # Separate old (>=4h) from recent deployments
-    local recent_indices=()
-    local old_indices=()
     for (( i = 0; i < ${#DEP_IDS[@]}; i++ )); do
-      if _is_old_deployment "${DEP_CREATED_AT_MS[i]:-}"; then
-        old_indices+=("$i")
-      else
-        recent_indices+=("$i")
-      fi
-    done
-
-    # ── Recent / Active deployments ──
-    for i in "${recent_indices[@]}"; do
       status="${DEP_STATUS[i]:-UNKNOWN}"
 
-      change_title_label="$(deployment_change_label "${DEP_CHANGE_TITLE[i]:-}" "${DEP_BRANCH[i]:-}" "${DEP_TARGET[i]:-preview}" "${DEP_URL[i]:-}")"
-      local pr_display
-      pr_display="$(pull_request_display_label "$(sanitize_field "${DEP_PULL_REQUEST[i]:-}")")"
-
-      # Build concise title: PR#N title or just title
-      local title_raw=""
-      if [[ "$pr_display" != "n/a" ]]; then
-        title_raw="${pr_display} "
-      fi
-      if [[ "$change_title_label" != "n/a" ]]; then
-        title_raw="${title_raw}${change_title_label}"
-      fi
-      if [[ -z "$title_raw" ]]; then
-        title_raw="$(deployment_identity_label "${DEP_BRANCH[i]:-}" "${DEP_TARGET[i]:-preview}" "${DEP_URL[i]:-}" "${DEP_PULL_REQUEST[i]:-}" "${DEP_COMMIT_SHA[i]:-}" "${DEP_SOURCE[i]:-}" "${DEP_ACTOR[i]:-}")"
-      fi
-      title_raw="$(truncate_text "$title_raw" 120)"
+      title_raw="$(_build_title_for_deployment "$i")"
 
       duration_seconds="$(duration_seconds_for_record "${DEP_CREATED_AT_MS[i]:-}" "${DEP_READY_AT_MS[i]:-}" "${DEP_FIRST_SEEN_EPOCH[i]:-$now_seconds}")"
       duration_text="$(format_duration "$duration_seconds")"
 
       if is_active_status "$status"; then
-        # ── Active: full card with step details ──
-        local env_mark status_label
+        # ── Active deployment: icon + title + inline progress ──
+        local env_mark status_label step_label progress
         env_mark="$(environment_icon "${DEP_TARGET[i]:-preview}")"
         status_label="$(friendly_status "$status")"
-
-        print_dashboard_linef '%s %s  %s  %s%s%s' \
-          "$env_mark" "$(color_pad "$status_label" 12)" "$(color_pad "$title_raw" 120)" \
-          "${C_DIM}" "$duration_text" "${C_RESET}"
-
         step_label="$(deployment_step_label "$i")"
-        _render_active_steps "$status" "$step_label" "${DEP_STEP_HISTORY[i]:-}" "$now_seconds"
+        progress="$(_render_inline_progress "$status" "$step_label" "${DEP_STEP_HISTORY[i]:-}" "$now_seconds")"
+
+        title_raw="$(truncate_text "$title_raw" 72)"
+        print_dashboard_linef '  %s %s  %s' \
+          "$env_mark" "$(color_pad "$status_label" 12)" "$(color_pad "$title_raw" 72)"
+        print_dashboard_linef '    %s  %s%s%s' \
+          "$progress" "${C_DIM}" "$duration_text" "${C_RESET}"
         print_dashboard_line ""
       else
-        # ── Completed (ready/error/canceled): compact single line ──
+        # ── Completed: icon + title + duration + age (one line) ──
         local row_icon started_relative
         row_icon="$(status_icon "$status")"
         started_relative="$(relative_time_from_ms "${DEP_CREATED_AT_MS[i]:-}")"
 
-        print_dashboard_linef '  %s  %s  %s%6s  %s%s' \
-          "$row_icon" "$(color_pad "$title_raw" 120)" \
-          "${C_DIM}" "$duration_text" "$started_relative" "${C_RESET}"
-
-        error_text="$(sanitize_field "${DEP_ERROR_MESSAGE[i]:-}")"
-        if [[ -n "$error_text" && ( "$status" == "ERROR" || "$status" == "FAILED" || "$status" == "CANCELED" ) ]]; then
-          error_text="$(truncate_text "$error_text" 80)"
-          print_dashboard_linef '    %s%s%s' "${C_RED}" "$error_text" "${C_RESET}"
+        error_text=""
+        if [[ "$status" == "ERROR" || "$status" == "FAILED" || "$status" == "CANCELED" ]]; then
+          error_text="$(sanitize_field "${DEP_ERROR_MESSAGE[i]:-}")"
+          if [[ -n "$error_text" ]]; then
+            error_text="  ${C_RED}$(truncate_text "$error_text" 50)${C_RESET}"
+          fi
         fi
+
+        title_raw="$(truncate_text "$title_raw" 80)"
+        print_dashboard_linef '  %s  %s  %s%5s  %s%s%s' \
+          "$row_icon" "$(color_pad "$title_raw" 80)" \
+          "${C_DIM}" "$duration_text" "$started_relative" "${C_RESET}" "$error_text"
       fi
     done
+  fi
 
-    # ── Old deployments (compact) ──
-    if (( ${#old_indices[@]} > 0 )); then
-      print_dashboard_linef '%s── older ──%s' "${C_DIM}" "${C_RESET}"
-      for i in "${old_indices[@]}"; do
-        status="${DEP_STATUS[i]:-UNKNOWN}"
-        local row_icon started_time_label old_title old_error
+  print_dashboard_line ""
 
-        row_icon="$(status_icon "$status")"
-        started_time_label="$(format_ms_local "${DEP_CREATED_AT_MS[i]:-}")"
-        old_title="$(deployment_change_label "${DEP_CHANGE_TITLE[i]:-}" "${DEP_BRANCH[i]:-}" "${DEP_TARGET[i]:-preview}" "${DEP_URL[i]:-}")"
-        old_title="$(truncate_text "$old_title" 90)"
-
-        duration_seconds="$(duration_seconds_for_record "${DEP_CREATED_AT_MS[i]:-}" "${DEP_READY_AT_MS[i]:-}" "${DEP_FIRST_SEEN_EPOCH[i]:-$now_seconds}")"
-        duration_text="$(format_duration "$duration_seconds")"
-
-        if [[ "$status" == "ERROR" || "$status" == "FAILED" ]]; then
-          old_error="$(sanitize_field "${DEP_ERROR_MESSAGE[i]:-}")"
-          old_error="$(truncate_text "$old_error" 40)"
-          print_dashboard_linef '  %s  %s%s%s  %s  %s%6s  %s%s%s' \
-            "$row_icon" "${C_DIM}" "$started_time_label" "${C_RESET}" \
-            "$(color_pad "$old_title" 90)" \
-            "${C_DIM}" "$duration_text" "${C_RED}${old_error}" "${C_RESET}" ""
-        else
-          print_dashboard_linef '  %s  %s%s%s  %s  %s%6s%s' \
-            "$row_icon" "${C_DIM}" "$started_time_label" "${C_RESET}" \
-            "$(color_pad "$old_title" 90)" \
-            "${C_DIM}" "$duration_text" "${C_RESET}"
-        fi
-      done
-      print_dashboard_line ""
-    fi
+  # ── Alert ──
+  if [[ "${LAST_ALERT_MESSAGE:-None}" != "None" && "${LAST_ALERT_MESSAGE:-}" != "Starting..." ]]; then
+    local alert_mark_icon alert_age
+    alert_mark_icon="$(alert_icon "${LAST_ALERT_LEVEL:-info}")"
+    alert_age="$(relative_time_from_epoch "$LAST_ALERT_EPOCH")"
+    print_dashboard_linef '  %s %s  %s%s%s' \
+      "$alert_mark_icon" "${LAST_ALERT_MESSAGE}" "${C_DIM}" "$alert_age" "${C_RESET}"
   fi
 
   end_dashboard_render
