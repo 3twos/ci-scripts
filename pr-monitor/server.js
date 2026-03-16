@@ -403,6 +403,12 @@ function enqueueUpdate(number) {
   if (updateInFlight === number) return;
   if (updateQueue.includes(number)) return;
   updateQueue.push(number);
+  // Mark as updating immediately so UI reflects it before queue processes
+  const pr = prStore.get(number);
+  if (pr && !pr.isUpdating) {
+    pr.isUpdating = true;
+    broadcastState();
+  }
   processUpdateQueue();
 }
 
