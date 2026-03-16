@@ -513,20 +513,40 @@ const MAX_DEPLOY_ALERTS = 50;
 const activeStreams = new Map(); // deploymentId -> https.ClientRequest
 
 function makeDeploymentState(raw) {
+  const m = raw.meta || {};
+  // Title priority: PR title > commit subject > commit message first line
+  const rawTitle = m.githubPullRequestTitle || m.gitlabMergeRequestTitle
+    || m.pullRequestTitle || m.prTitle
+    || m.githubCommitSubject
+    || m.githubCommitMessage || m.gitCommitMessage || m.commitMessage || m.message || '';
+  const changeTitle = rawTitle.split(/[\n\r]/)[0].split(' * ')[0].trim();
+
+  // PR number: try multiple meta fields
+  const pullRequest = m.githubPullRequestNumber || m.githubPrNumber || m.githubPrId
+    || m.pullRequestNumber || m.prNumber || null;
+
+  // Branch: try multiple providers
+  const branch = m.githubCommitRef || m.gitlabCommitRef || m.bitbucketCommitRef
+    || m.gitCommitRef || m.branch || m.commitRef || '';
+
+  // Commit SHA
+  const commitSha = m.githubCommitSha || m.gitlabCommitSha || m.bitbucketCommitSha
+    || m.gitCommitSha || m.commitSha || m.commit || '';
+
   return {
     id: raw.uid || raw.id || '',
-    status: raw.state || raw.readyState || 'QUEUED',
+    status: (raw.readyState || raw.state || 'QUEUED').toUpperCase(),
     url: raw.url ? `https://${raw.url}` : '',
     createdAtMs: raw.createdAt || raw.created || Date.now(),
     readyAtMs: raw.ready || 0,
-    target: raw.target || 'preview',
-    branch: raw.meta?.githubCommitRef || raw.meta?.branch || '',
-    errorMessage: raw.errorMessage || '',
-    source: raw.source || '',
-    actor: raw.creator?.username || '',
-    commitSha: raw.meta?.githubCommitSha || '',
-    changeTitle: raw.meta?.githubCommitMessage || '',
-    pullRequest: raw.meta?.githubPrId || null,
+    target: (raw.target || 'preview').toLowerCase(),
+    branch,
+    errorMessage: raw.errorMessage || raw.errorCode || '',
+    source: raw.source || m.deploymentSource || m.source || '',
+    actor: raw.creator?.username || raw.creator?.name || raw.creator?.email || '',
+    commitSha,
+    changeTitle,
+    pullRequest,
     step: '',
     lastEventMs: 0,
     _lastStatus: '',
@@ -555,7 +575,7 @@ function serializeDeployment(dep) {
 }
 
 function isTerminalDeployStatus(status) {
-  return ['READY', 'ERROR', 'CANCELED'].includes(status);
+  return ['READY', 'ERROR', 'FAILED', 'CANCELED'].includes(status);
 }
 
 function formatSpokenDuration(seconds) {
@@ -729,22 +749,34 @@ function handleDeploymentEvent(deploymentId, event) {
   }
 }
 
+function deployIdentity(dep) {
+  // Build a spoken-friendly identity: "Main PR #42 Fix auth flow" or "PR #42" or "main"
+  const isProd = dep.target === 'production';
+  const prLabel = dep.pullRequest ? `PR #${dep.pullRequest}` : '';
+  const title = dep.changeTitle || '';
+  const parts = [];
+  if (isProd) parts.push('Main');
+  if (prLabel) parts.push(prLabel);
+  if (title) parts.push(title);
+  if (parts.length === 0) parts.push(dep.branch || 'deployment');
+  return parts.join(' ');
+}
+
 function announceDeploymentTerminal(dep) {
   const durationSec = Math.round(((dep.readyAtMs || dep.lastEventMs || Date.now()) - dep.createdAtMs) / 1000);
   const duration = formatSpokenDuration(durationSec);
-  const env = dep.target === 'production' ? 'Main' : `PR #${dep.pullRequest || dep.branch}`;
-  const title = dep.changeTitle ? ` ${dep.changeTitle.split('\n')[0].slice(0, 80)}` : '';
+  const identity = deployIdentity(dep);
 
   let a;
   switch (dep.status) {
     case 'READY':
-      a = deployAlert('success', `Deployed ${env}${title} in ${duration}`);
+      a = deployAlert('success', `Deployed ${identity} in ${duration}`);
       break;
-    case 'ERROR':
-      a = deployAlert('error', `${env} deployment failed after ${duration}. ${dep.errorMessage || ''}`);
+    case 'ERROR': case 'FAILED':
+      a = deployAlert('error', `${identity} failed after ${duration}${dep.errorMessage ? '. ' + dep.errorMessage : ''}`);
       break;
     case 'CANCELED':
-      a = deployAlert('warning', `${env} deployment canceled`);
+      a = deployAlert('warning', `${identity} canceled`);
       break;
   }
   if (a) broadcastDeployAlert(a);
@@ -783,9 +815,8 @@ async function refreshDeployments() {
 
         // Announce new active deployments
         if (!isTerminalDeployStatus(dep.status)) {
-          const env = dep.target === 'production' ? 'Main' : `PR #${dep.pullRequest || dep.branch}`;
-          const title = dep.changeTitle ? ` ${dep.changeTitle.split('\n')[0].slice(0, 80)}` : '';
-          const a = deployAlert('info', `Starting ${env}${title}`);
+          const identity = deployIdentity(dep);
+          const a = deployAlert('info', `Starting ${identity}`);
           if (a) broadcastDeployAlert(a);
         }
       } else {
