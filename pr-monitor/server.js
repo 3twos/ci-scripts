@@ -249,9 +249,9 @@ function detectTransitions(pr) {
     else if (pr.isReady) { suffix = ', ready to merge'; pr._announced.ready = true; }
     else if (pr.reviewState === 'approved') suffix = ', approved';
     else if (pr.reviewState === 'none' && !pr.isDraft) { suffix = ', no review requested'; pr._announced.noReview = true; }
-    else if (pr.mergeStateStatus === 'BEHIND') suffix = ', behind';
+    else if (['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus)) suffix = ', behind';
     alert('info', `${num} created${suffix}`);
-    if (pr.mergeStateStatus === 'BEHIND' && config.autoUpdate) tryUpdateBranch(num);
+    if (['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING' && config.autoUpdate) tryUpdateBranch(num);
     return alerts;
   }
 
@@ -291,9 +291,11 @@ function detectTransitions(pr) {
     alert('success', `${num} conflicts resolved`);
   }
 
-  // Behind
-  if (pr.mergeStateStatus === 'BEHIND') {
-    if (config.autoUpdate && prev.mergeStateStatus !== 'BEHIND') tryUpdateBranch(num);
+  // Behind / blocked — try auto-update when merge state indicates branch is not current
+  const needsUpdate = ['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
+  const prevNeedsUpdate = prev && ['BEHIND', 'BLOCKED', 'DIRTY'].includes(prev.mergeStateStatus);
+  if (needsUpdate && config.autoUpdate && !prevNeedsUpdate) {
+    tryUpdateBranch(num);
   }
 
   // CI
@@ -319,11 +321,12 @@ function detectTransitions(pr) {
   if (!pr.isReady) pr._announced.ready = false;
 
   // "Still" reminders
-  const hasIssue = pr.mergeable === 'CONFLICTING' || pr.ciStatus === 'failing' || pr.reviewState === 'changes' || pr.mergeStateStatus === 'BEHIND';
+  const isBehind = ['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
+  const hasIssue = pr.mergeable === 'CONFLICTING' || pr.ciStatus === 'failing' || pr.reviewState === 'changes' || isBehind;
   const issueDesc = pr.mergeable === 'CONFLICTING' ? 'has conflicts'
     : pr.ciStatus === 'failing' ? 'CI failing'
     : pr.reviewState === 'changes' ? 'unresolved comments'
-    : pr.mergeStateStatus === 'BEHIND' ? 'behind' : '';
+    : isBehind ? 'behind' : '';
 
   if (hasIssue) {
     if (pr._issueSinceEpoch === 0) { pr._issueSinceEpoch = Date.now(); pr._announcedStill = false; }
