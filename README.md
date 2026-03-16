@@ -35,6 +35,23 @@ VERCEL_TOKEN=... ./monitor-vercel-deployment.sh --project-id prj_xxx --project-n
 
 Run any script with `--help` for full options.
 
+## PR Monitor Web UI (`pr-monitor/`)
+
+Real-time PR dashboard in the browser — webhook-driven, zero npm dependencies.
+
+```bash
+# Install the webhook extension (one-time)
+gh extension install cli/gh-webhook
+
+# Start the monitor
+node pr-monitor/server.js 3twos/inposter
+# Open http://localhost:8420
+```
+
+Features: real-time updates via GitHub webhooks + SSE, voice alerts (Web Speech API), desktop notifications, dark-mode UI, auto-reconnect. Falls back to polling if webhooks aren't available.
+
+Options: `--port`, `--author`, `--branch`, `--auto-update`, `--no-voice`, `--no-webhook`, `--interval`.
+
 ## Prerequisites
 
 - `gh` (GitHub CLI) — authenticated via `gh auth login`

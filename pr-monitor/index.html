@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR Monitor</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text2: #8b949e;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+  --blue: #58a6ff;
+  --purple: #bc8cff;
+  --orange: #f0883e;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+header .repo { font-size: 16px; font-weight: 600; color: var(--blue); }
+header .meta { color: var(--text2); font-size: 13px; }
+header .spacer { flex: 1; }
+.conn-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.conn-dot.live { background: var(--green); }
+.conn-dot.polling { background: var(--yellow); }
+.conn-dot.disconnected { background: var(--red); }
+
+/* Voice banner */
+#voice-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text2);
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+#voice-banner:hover { background: var(--border); }
+#voice-banner.hidden { display: none; }
+
+/* Main */
+main { flex: 1; overflow: auto; padding: 16px 20px; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+tr:hover td { background: var(--bg3); }
+td.title { white-space: normal; word-break: break-word; max-width: 400px; }
+td.num { font-family: var(--mono); font-size: 13px; }
+td.num a { color: var(--blue); text-decoration: none; }
+td.num a:hover { text-decoration: underline; }
+td.threads { font-family: var(--mono); text-align: center; }
+td.reviewers { color: var(--text2); font-size: 13px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.badge-ready { background: rgba(63,185,80,0.15); color: var(--green); }
+.badge-conflict { background: rgba(248,81,73,0.15); color: var(--red); }
+.badge-ci-fail { background: rgba(248,81,73,0.15); color: var(--red); }
+.badge-behind { background: rgba(210,153,34,0.15); color: var(--yellow); }
+.badge-blocked { background: rgba(210,153,34,0.15); color: var(--yellow); }
+.badge-pending { background: rgba(88,166,255,0.15); color: var(--blue); }
+.badge-draft { background: rgba(188,140,255,0.1); color: var(--purple); }
+.badge-open { background: rgba(88,166,255,0.1); color: var(--blue); }
+
+/* CI / Merge / Review colored text */
+.ci-passing { color: var(--green); }
+.ci-failing { color: var(--red); }
+.ci-pending { color: var(--yellow); }
+.ci-none { color: var(--text2); }
+.merge-clean { color: var(--green); }
+.merge-behind { color: var(--yellow); }
+.merge-blocked { color: var(--yellow); }
+.merge-dirty { color: var(--red); }
+.merge-conflict { color: var(--red); }
+.merge-unknown { color: var(--text2); }
+.review-approved { color: var(--green); }
+.review-changes { color: var(--yellow); }
+.review-pending { color: var(--blue); }
+.review-none { color: var(--text2); }
+.threads-warn { color: var(--yellow); font-weight: 600; }
+.threads-ok { color: var(--text2); }
+
+/* Row flash animation */
+@keyframes rowFlash {
+  0% { background-color: rgba(88,166,255,0.12); }
+  100% { background-color: transparent; }
+}
+tr.flash td { animation: rowFlash 1.5s ease-out; }
+
+/* Alert log */
+#alert-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px 20px;
+}
+#alert-panel:empty::before {
+  content: 'No alerts yet';
+  color: var(--text2);
+  font-size: 13px;
+}
+.alert-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.alert-ts { color: var(--text2); font-family: var(--mono); font-size: 12px; flex-shrink: 0; }
+.alert-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.alert-dot.success { background: var(--green); }
+.alert-dot.error { background: var(--red); }
+.alert-dot.warning { background: var(--yellow); }
+.alert-dot.info { background: var(--blue); }
+.alert-msg { color: var(--text); }
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text2);
+  font-size: 15px;
+}
+
+/* Webhook flash indicator */
+#webhook-flash {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+  opacity: 0;
+  margin-left: 4px;
+  transition: opacity 0.1s;
+}
+#webhook-flash.active { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="repo" id="repo-name">PR Monitor</span>
+  <span class="meta" id="pr-count"></span>
+  <span class="spacer"></span>
+  <span class="meta" id="uptime"></span>
+  <span class="meta">
+    <span class="conn-dot disconnected" id="conn-dot"></span>
+    <span id="conn-label">Connecting</span>
+    <span id="webhook-flash"></span>
+  </span>
+</header>
+
+<div id="voice-banner" onclick="enableVoice()">
+  🔊 Click to enable voice alerts
+</div>
+
+<main>
+  <div class="empty-state" id="empty-state">Connecting...</div>
+  <table id="pr-table" style="display:none">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Status</th>
+        <th>CI</th>
+        <th>Merge</th>
+        <th>Review</th>
+        <th>Threads</th>
+        <th>Reviewers</th>
+        <th>Title</th>
+      </tr>
+    </thead>
+    <tbody id="pr-body"></tbody>
+  </table>
+</main>
+
+<div id="alert-panel"></div>
+
+<script>
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+let prs = [];
+let prevPrMap = new Map();
+let serverConfig = {};
+let voiceUnlocked = false;
+let voiceQueue = [];
+let speaking = false;
+let startedAt = 0;
+let evtSource = null;
+let reconnectTimer = null;
+
+// ---------------------------------------------------------------------------
+// SSE Connection
+// ---------------------------------------------------------------------------
+
+function connectSSE() {
+  if (evtSource) { evtSource.close(); }
+  evtSource = new EventSource('/events');
+
+  evtSource.addEventListener('init', (e) => {
+    const data = JSON.parse(e.data);
+    serverConfig = data.config || {};
+    startedAt = data.startedAt || Date.now();
+    prs = data.prs || [];
+    renderPrs(prs, true);
+    (data.alerts || []).forEach(a => appendAlert(a, false));
+    setConn('live');
+    updateHeader();
+    document.getElementById('repo-name').textContent = serverConfig.repo || 'PR Monitor';
+    if (serverConfig.noVoice) document.getElementById('voice-banner').classList.add('hidden');
+  });
+
+  evtSource.addEventListener('state', (e) => {
+    const data = JSON.parse(e.data);
+    prs = data.prs || [];
+    renderPrs(prs, false);
+    updateHeader();
+  });
+
+  evtSource.addEventListener('alert', (e) => {
+    const alert = JSON.parse(e.data);
+    appendAlert(alert, true);
+  });
+
+  evtSource.addEventListener('heartbeat', () => {
+    // keep-alive
+  });
+
+  evtSource.addEventListener('webhook', () => {
+    flashWebhook();
+  });
+
+  evtSource.addEventListener('shutdown', () => {
+    setConn('disconnected');
+  });
+
+  evtSource.onerror = () => {
+    setConn('disconnected');
+    evtSource.close();
+    evtSource = null;
+    reconnectTimer = setTimeout(connectSSE, 3000);
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+function renderPrs(prList, initial) {
+  const table = document.getElementById('pr-table');
+  const empty = document.getElementById('empty-state');
+  const tbody = document.getElementById('pr-body');
+
+  if (prList.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = 'flex';
+    empty.textContent = 'No open PRs found';
+    return;
+  }
+
+  table.style.display = '';
+  empty.style.display = 'none';
+
+  // Build new rows
+  const newMap = new Map();
+  const frag = document.createDocumentFragment();
+  const sorted = [...prList].sort((a, b) => a.number - b.number);
+
+  for (const pr of sorted) {
+    newMap.set(pr.number, pr);
+    const changed = !initial && hasChanged(pr);
+    const tr = document.createElement('tr');
+    tr.dataset.pr = pr.number;
+    if (changed) tr.classList.add('flash');
+
+    tr.innerHTML = `
+      <td class="num"><a href="${esc(pr.url)}" target="_blank">#${pr.number}</a></td>
+      <td>${statusBadge(pr)}</td>
+      <td>${ciLabel(pr.ciStatus)}</td>
+      <td>${mergeLabel(pr.mergeable, pr.mergeStateStatus)}</td>
+      <td>${reviewLabel(pr.reviewState)}</td>
+      <td class="threads ${pr.unresolvedThreads > 0 ? 'threads-warn' : 'threads-ok'}">${pr.unresolvedThreads}</td>
+      <td class="reviewers" title="${esc(allReviewers(pr))}">${esc(allReviewers(pr)) || '—'}</td>
+      <td class="title">${esc(pr.title)}${pr.isDraft ? ' <span class="badge badge-draft">draft</span>' : ''}</td>
+    `;
+    frag.appendChild(tr);
+  }
+
+  tbody.replaceChildren(frag);
+  prevPrMap = newMap;
+}
+
+function hasChanged(pr) {
+  const prev = prevPrMap.get(pr.number);
+  if (!prev) return true;
+  return prev.ciStatus !== pr.ciStatus
+    || prev.mergeable !== pr.mergeable
+    || prev.mergeStateStatus !== pr.mergeStateStatus
+    || prev.reviewState !== pr.reviewState
+    || prev.reviewCount !== pr.reviewCount
+    || prev.unresolvedThreads !== pr.unresolvedThreads
+    || prev.isReady !== pr.isReady;
+}
+
+function statusBadge(pr) {
+  if (pr.isDraft) return '<span class="badge badge-draft">Draft</span>';
+  if (pr.isReady) return '<span class="badge badge-ready">Ready</span>';
+  if (pr.mergeable === 'CONFLICTING') return '<span class="badge badge-conflict">Conflict</span>';
+  if (pr.ciStatus === 'failing') return '<span class="badge badge-ci-fail">CI Fail</span>';
+  if (pr.mergeStateStatus === 'BEHIND') return '<span class="badge badge-behind">Behind</span>';
+  if (pr.mergeStateStatus === 'BLOCKED') return '<span class="badge badge-blocked">Blocked</span>';
+  if (pr.ciStatus === 'pending') return '<span class="badge badge-pending">Pending</span>';
+  return '<span class="badge badge-open">Open</span>';
+}
+
+function ciLabel(status) {
+  const labels = { passing: '✓ passing', failing: '✗ failing', pending: '◑ pending', none: '— none' };
+  const cls = { passing: 'ci-passing', failing: 'ci-failing', pending: 'ci-pending', none: 'ci-none' };
+  return `<span class="${cls[status] || 'ci-none'}">${labels[status] || status}</span>`;
+}
+
+function mergeLabel(mergeable, state) {
+  if (mergeable === 'CONFLICTING') return '<span class="merge-conflict">conflict</span>';
+  const map = { CLEAN: 'clean', BEHIND: 'behind', BLOCKED: 'blocked', DIRTY: 'dirty', UNSTABLE: 'unstable', UNKNOWN: '?' };
+  const cls = { CLEAN: 'merge-clean', BEHIND: 'merge-behind', BLOCKED: 'merge-blocked', DIRTY: 'merge-dirty', UNSTABLE: 'merge-behind', UNKNOWN: 'merge-unknown' };
+  return `<span class="${cls[state] || 'merge-unknown'}">${map[state] || state}</span>`;
+}
+
+function reviewLabel(state) {
+  const map = { approved: 'approved', changes: 'changes', pending: 'pending', none: 'none' };
+  const cls = { approved: 'review-approved', changes: 'review-changes', pending: 'review-pending', none: 'review-none' };
+  return `<span class="${cls[state] || 'review-none'}">${map[state] || state}</span>`;
+}
+
+function allReviewers(pr) {
+  const set = new Set([...(pr.reviewers || []), ...(pr.requestedReviewers || [])]);
+  return [...set].map(shortName).join(', ');
+}
+
+function shortName(login) {
+  if (login.startsWith('copilot')) return 'copilot';
+  return login.split(/[-_.]/)[0];
+}
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Alerts
+// ---------------------------------------------------------------------------
+
+function appendAlert(alert, live) {
+  const panel = document.getElementById('alert-panel');
+  const entry = document.createElement('div');
+  entry.className = 'alert-entry';
+  const ts = new Date(alert.ts).toLocaleTimeString('en-US', { hour12: false });
+  entry.innerHTML = `
+    <span class="alert-ts">${ts}</span>
+    <span class="alert-dot ${alert.level}"></span>
+    <span class="alert-msg">${esc(alert.message)}</span>
+  `;
+  panel.appendChild(entry);
+
+  // Prune
+  while (panel.children.length > 50) panel.removeChild(panel.firstChild);
+
+  // Auto-scroll
+  panel.scrollTop = panel.scrollHeight;
+
+  // Voice + notification on live alerts only
+  if (live) {
+    speakAlert(alert.message);
+    showNotification(alert);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Voice (Web Speech API)
+// ---------------------------------------------------------------------------
+
+function enableVoice() {
+  if (!window.speechSynthesis) {
+    document.getElementById('voice-banner').textContent = '⚠ Speech not supported in this browser';
+    return;
+  }
+  voiceUnlocked = true;
+  document.getElementById('voice-banner').classList.add('hidden');
+
+  // Request notification permission at the same time
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
+  // Speak a test to fully unlock
+  const u = new SpeechSynthesisUtterance('PR monitor active');
+  u.volume = 0.5;
+  speechSynthesis.speak(u);
+}
+
+function speakAlert(message) {
+  if (!voiceUnlocked || serverConfig.noVoice || !window.speechSynthesis) return;
+  voiceQueue.push(message);
+  processVoiceQueue();
+}
+
+function processVoiceQueue() {
+  if (speaking || voiceQueue.length === 0) return;
+  speaking = true;
+  const utterance = new SpeechSynthesisUtterance(voiceQueue.shift());
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+  utterance.onend = () => { speaking = false; processVoiceQueue(); };
+  utterance.onerror = () => { speaking = false; processVoiceQueue(); };
+  speechSynthesis.speak(utterance);
+}
+
+// ---------------------------------------------------------------------------
+// Desktop Notifications
+// ---------------------------------------------------------------------------
+
+function showNotification(alert) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  new Notification(`PR #${alert.prNumber}`, {
+    body: alert.message,
+    tag: 'pr-monitor-' + alert.prNumber,
+    silent: true,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Header / Connection
+// ---------------------------------------------------------------------------
+
+function setConn(state) {
+  const dot = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  dot.className = 'conn-dot ' + state;
+  const labels = { live: 'Live', polling: 'Polling', disconnected: 'Disconnected' };
+  label.textContent = labels[state] || state;
+}
+
+function updateHeader() {
+  document.getElementById('pr-count').textContent = `${prs.length} PRs`;
+  if (startedAt) {
+    const secs = Math.floor((Date.now() - startedAt) / 1000);
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    document.getElementById('uptime').textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+}
+
+let webhookFlashTimer = null;
+function flashWebhook() {
+  const el = document.getElementById('webhook-flash');
+  el.classList.add('active');
+  clearTimeout(webhookFlashTimer);
+  webhookFlashTimer = setTimeout(() => el.classList.remove('active'), 400);
+}
+
+// Update uptime every 30s
+setInterval(updateHeader, 30000);
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+
+connectSSE();
+</script>
+</body>
+</html>
