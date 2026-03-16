@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="theme-dark size-l font-fira">
+<html lang="en" class="theme-dark font-fira uifont-roboto">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,15 +11,20 @@
 // Apply settings BEFORE first render to avoid flash
 (function() {
   var t = localStorage.getItem('pr-monitor-theme') || 'dark';
-  var s = localStorage.getItem('pr-monitor-size') || 'l';
   var f = localStorage.getItem('pr-monitor-font') || 'fira';
   var u = localStorage.getItem('pr-monitor-uifont') || 'roboto';
+  var ps = localStorage.getItem('pr-monitor-pr-size') || '12';
+  var ds = localStorage.getItem('pr-monitor-deploy-size') || '11';
   var themeClass = t;
   if (t === 'system') {
     themeClass = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
-  document.documentElement.className = 'theme-' + themeClass + ' size-' + s + ' font-' + f + ' uifont-' + u;
+  document.documentElement.className = 'theme-' + themeClass + ' font-' + f + ' uifont-' + u;
   document.documentElement.dataset.theme = t;
+  document.documentElement.style.setProperty('--pr-size', ps + 'pt');
+  document.documentElement.style.setProperty('--scale', ps + 'pt');
+  document.documentElement.style.setProperty('--density', Math.max(6, ps - 2) + 'pt');
+  document.documentElement.style.setProperty('--deploy-size', ds + 'pt');
 })();
 </script>
 <style>
@@ -100,11 +105,14 @@ html.uifont-system { --font-ui: system-ui, -apple-system, BlinkMacSystemFont, sa
 html.uifont-plex   { --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
 
 /* ─── Scalable sizing via custom properties ─── */
-html { --scale: 11pt; --density: 9pt; --card-radius: 10px; }
-html.size-s  { --scale: 9pt; --density: 6pt; --card-radius: 8px; }
-html.size-m  { --scale: 11pt; --density: 9pt; --card-radius: 10px; }
-html.size-l  { --scale: 12pt; --density: 10pt; --card-radius: 12px; }
-html.size-xl { --scale: 14pt; --density: 12pt; --card-radius: 14px; }
+html {
+  --pr-size: 12pt;
+  --deploy-size: 11pt;
+  --scale: var(--pr-size);
+  --density: 10pt;
+  --card-radius: 10px;
+}
+#deploy-section { font-size: var(--deploy-size); }
 
 html, body { height: 100%; }
 body {
@@ -411,6 +419,25 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .font-card .font-preview { font-size: 16px; color: var(--text); line-height: 1.3; }
 .font-card .font-mono-preview { font-size: 11px; color: var(--text3); margin-top: 4px; }
 
+/* Range slider */
+.size-slider-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.size-slider-label { font-size: 12px; color: var(--text2); width: 80px; flex-shrink: 0; }
+.size-slider-val { font-size: 12px; color: var(--text); font-family: var(--mono); width: 36px; text-align: right; flex-shrink: 0; }
+input[type=range] {
+  flex: 1; -webkit-appearance: none; appearance: none; height: 4px;
+  background: var(--bg4); border-radius: 2px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--blue); cursor: pointer; border: 2px solid var(--bg2);
+}
+input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--blue); cursor: pointer; border: 2px solid var(--bg2);
+}
+
 /* Preview section */
 .settings-preview {
   padding: 12px; border-radius: 8px; border: 1px solid var(--border);
@@ -493,12 +520,16 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
     </div>
 
     <div class="settings-section">
-      <label>Text Size</label>
-      <div class="seg-control" id="size-control">
-        <button class="seg-opt" data-size="s" onclick="setSize('s')">S</button>
-        <button class="seg-opt" data-size="m" onclick="setSize('m')">M</button>
-        <button class="seg-opt" data-size="l" onclick="setSize('l')">L</button>
-        <button class="seg-opt" data-size="xl" onclick="setSize('xl')">XL</button>
+      <label>Text Size (pt)</label>
+      <div class="size-slider-row">
+        <span class="size-slider-label">PRs</span>
+        <input type="range" min="8" max="18" step="1" id="pr-size-slider" oninput="setPrSize(this.value)">
+        <span class="size-slider-val" id="pr-size-val">12</span>
+      </div>
+      <div class="size-slider-row">
+        <span class="size-slider-label">Deployments</span>
+        <input type="range" min="8" max="18" step="1" id="deploy-size-slider" oninput="setDeploySize(this.value)">
+        <span class="size-slider-val" id="deploy-size-val">11</span>
       </div>
     </div>
 
@@ -566,6 +597,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 
 <div id="deploy-section" class="hidden">
   <div class="deploy-header">
+    <svg width="14" height="14" viewBox="0 0 76 65" fill="var(--text2)"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z"/></svg>
     <span class="deploy-title">Deployments</span>
     <span id="deploy-project-name"></span>
   </div>
@@ -759,9 +791,9 @@ function sizeIcon(label) {
 }
 function agentIcon(branch) {
   const b = (branch || '').toLowerCase();
-  // Claude: Anthropic brand orange
+  // Claude: official sparkle symbol in brand orange
   if (b.startsWith('claude/') || b.startsWith('claude-'))
-    return '<svg width="16" height="16" viewBox="0 0 46 32" fill="#D4A27F" title="Claude"><path d="M28.786.002a1.15 1.15 0 0 0-.593.18L16.82 7.497a1.15 1.15 0 0 0-.557.986v14.634a1.15 1.15 0 0 0 .557.987l11.373 7.314a1.15 1.15 0 0 0 1.185 0l11.374-7.314a1.15 1.15 0 0 0 .557-.987V8.483a1.15 1.15 0 0 0-.557-.986L29.378.182a1.15 1.15 0 0 0-.592-.18zM10.74 3.2a1.15 1.15 0 0 0-.593.18L.228 9.98A1.15 1.15 0 0 0 0 10.568v5.266a1.15 1.15 0 0 0 .557.987l3.468 2.232a1.15 1.15 0 0 0 1.186 0l9.919-6.384a1.15 1.15 0 0 0 .557-.987V6.418a1.15 1.15 0 0 0-.557-.987L11.333 3.38a1.15 1.15 0 0 0-.593-.18z"/></svg>';
+    return '<svg width="16" height="16" viewBox="0 0 1200 1200" fill="#d97757" title="Claude"><path d="M234 800l235-132 4-11-4-7h-11l-39-2-134-4-116-5-113-6-28-6-27-35 3-17 24-16 34 3 76 5 113 8 82 5 122 13h19l3-8-6-5-6-5L347 496 220 412l-66-48-36-24-18-23-8-50 33-36 44 3 11 3 44 34 95 73 124 91 18 15 7-5 1-4-8-13-67-122-72-124-32-51-8-31c-3-13-5-23-5-36l37-50 21-7 49 7 21 18 31 70 50 111 77 151 23 45 12 41 5 13h8v-7l6-85 12-104 11-134 4-38 19-45 37-24 29 14 24 34-3 22-14 92-28 144-18 97h11l12-12 49-65 82-103 36-41 42-45 27-21 51 0 38 56-17 58-53 67-44 57-63 85-39 67 4 5 9-1 142-30 77-14 91-16 41 19 5 20-17 40-97 24-115 23-171 40-2 2 2 3 77 7 33 2 81 0 150 11 39 26 24 32-4 24-60 31-82-19-190-46-65-16-9 0v5l54 53 100 90 125 116 6 29-16 23-17-3-110-82-42-37-96-81h-6v9l22 32 117 175 6 54-8 18-30 10-33-6-68-96-71-108-57-97-7 4-33 361-16 18-36 14-30-23-16-37 16-74 19-95 16-76 14-94 8-32v-2l-7 1-71 98-109 147-85 92-20 8-36-18 3-33 20-29 119-151 72-94 46-48v-8h-3L205 929l-56 7-24-22 3-37 11-12 95-65z"/></svg>';
   // Codex: OpenAI blue/white
   if (b.startsWith('codex/') || b.startsWith('codex-') || b.startsWith('openai/'))
     return '<svg width="16" height="16" viewBox="0 0 24 24" fill="#10A37F" title="Codex"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/></svg>';
@@ -1071,16 +1103,14 @@ function toggleSettings() {
 // Helper to rebuild html classes from current settings
 function rebuildHtmlClasses() {
   var theme = document.documentElement.dataset.theme || 'dark';
-  var size = document.documentElement.dataset.size || 'l';
   var font = document.documentElement.dataset.font || 'fira';
   var uifont = document.documentElement.dataset.uifont || 'roboto';
   var themeClass = theme;
   if (theme === 'system') {
     themeClass = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
-  document.documentElement.className = 'theme-' + themeClass + ' size-' + size + ' font-' + font + ' uifont-' + uifont;
+  document.documentElement.className = 'theme-' + themeClass + ' font-' + font + ' uifont-' + uifont;
   document.documentElement.dataset.theme = theme;
-  document.documentElement.dataset.size = size;
   document.documentElement.dataset.font = font;
   document.documentElement.dataset.uifont = uifont;
 }
@@ -1097,13 +1127,20 @@ function setTheme(theme) {
   setupSystemThemeListener();
 }
 
-function setSize(size) {
-  document.documentElement.dataset.size = size;
-  rebuildHtmlClasses();
-  document.querySelectorAll('#size-control .seg-opt').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.size === size);
-  });
-  try { localStorage.setItem('pr-monitor-size', size); } catch {}
+function setPrSize(pt) {
+  document.documentElement.style.setProperty('--pr-size', pt + 'pt');
+  document.documentElement.style.setProperty('--scale', pt + 'pt');
+  document.documentElement.style.setProperty('--density', Math.max(6, pt - 2) + 'pt');
+  document.getElementById('pr-size-val').textContent = pt;
+  document.getElementById('pr-size-slider').value = pt;
+  try { localStorage.setItem('pr-monitor-pr-size', pt); } catch {}
+}
+
+function setDeploySize(pt) {
+  document.documentElement.style.setProperty('--deploy-size', pt + 'pt');
+  document.getElementById('deploy-size-val').textContent = pt;
+  document.getElementById('deploy-size-slider').value = pt;
+  try { localStorage.setItem('pr-monitor-deploy-size', pt); } catch {}
 }
 
 function setFont(font) {
@@ -1140,21 +1177,22 @@ function setupSystemThemeListener() {
 // Restore all settings and sync UI controls
 (function() {
   var savedTheme = localStorage.getItem('pr-monitor-theme') || 'dark';
-  var savedSize = localStorage.getItem('pr-monitor-size') || 'l';
   var savedFont = localStorage.getItem('pr-monitor-font') || 'fira';
   var savedUiFont = localStorage.getItem('pr-monitor-uifont') || 'roboto';
+  var savedPrSize = localStorage.getItem('pr-monitor-pr-size') || '12';
+  var savedDeploySize = localStorage.getItem('pr-monitor-deploy-size') || '11';
 
   document.documentElement.dataset.theme = savedTheme;
-  document.documentElement.dataset.size = savedSize;
   document.documentElement.dataset.font = savedFont;
   document.documentElement.dataset.uifont = savedUiFont;
   rebuildHtmlClasses();
 
+  // Restore font sizes
+  setPrSize(savedPrSize);
+  setDeploySize(savedDeploySize);
+
   document.querySelectorAll('#theme-control .seg-opt').forEach(function(b) {
     b.classList.toggle('active', b.dataset.theme === savedTheme);
-  });
-  document.querySelectorAll('#size-control .seg-opt').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.size === savedSize);
   });
   document.querySelectorAll('#font-grid .font-card').forEach(function(c) {
     c.classList.toggle('active', c.dataset.font === savedFont);
