@@ -57,16 +57,9 @@ header {
 .logo a { color: var(--text); text-decoration: none; }
 .logo a:hover { color: var(--blue); }
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--bg3);
-  color: var(--text2);
-  border: 1px solid var(--border);
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500;
+  background: var(--bg3); color: var(--text2); border: 1px solid var(--border);
 }
 .chip .dot { width: 7px; height: 7px; border-radius: 50%; }
 .chip .dot.green { background: var(--green); box-shadow: 0 0 6px rgba(63,185,80,0.4); }
@@ -74,32 +67,55 @@ header {
 .chip .dot.red { background: var(--red); }
 header .spacer { flex: 1; }
 .header-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg3);
-  color: var(--text2);
-  font-size: 12px;
-  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text2); font-size: 12px; cursor: pointer;
   transition: all 0.15s;
 }
 .header-btn:hover { background: var(--bg4); color: var(--text); border-color: var(--text3); }
 .header-btn.active { color: var(--green); border-color: var(--green); background: rgba(63,185,80,0.08); }
 
+/* Voice selector */
+.voice-group { display: inline-flex; align-items: center; gap: 0; }
+.voice-group .header-btn { border-radius: var(--radius) 0 0 var(--radius); }
+.voice-select {
+  padding: 5px 4px 5px 8px; border-radius: 0 var(--radius) var(--radius) 0;
+  border: 1px solid var(--border); border-left: none;
+  background: var(--bg3); color: var(--text2); font-size: 11px; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='%238b949e' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 5L0 0h8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 6px center;
+  padding-right: 18px; max-width: 140px;
+  transition: all 0.15s;
+}
+.voice-select:hover { background-color: var(--bg4); border-color: var(--text3); }
+.voice-select:focus { outline: none; border-color: var(--blue); }
+
 /* ─── Main ─── */
 main { flex: 1; overflow: auto; padding: 20px 24px; }
 
+/* ─── Column headers ─── */
+.col-headers {
+  display: grid;
+  grid-template-columns: 56px 100px 80px 80px 80px 60px 120px 1fr 90px;
+  gap: 8px;
+  padding: 0 18px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text3);
+  user-select: none;
+}
+
 /* ─── PR Cards ─── */
-.pr-list { display: flex; flex-direction: column; gap: 8px; }
+.pr-list { display: flex; flex-direction: column; gap: 6px; }
 .pr-card {
   display: grid;
-  grid-template-columns: 60px 100px 1fr auto;
+  grid-template-columns: 56px 100px 80px 80px 80px 60px 120px 1fr 90px;
   align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
+  gap: 8px;
+  padding: 12px 18px;
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -107,23 +123,14 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 }
 .pr-card:hover { border-color: var(--text3); background: var(--bg3); }
 
-/* Number */
-.pr-num { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+.pr-num { font-family: var(--mono); font-size: 13px; font-weight: 600; }
 .pr-num a { color: var(--blue); text-decoration: none; }
 .pr-num a:hover { text-decoration: underline; }
 
-/* Badge */
 .badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap;
 }
 .badge-ready { background: var(--green-dim); color: var(--green); }
 .badge-conflict { background: var(--red-dim); color: var(--red); }
@@ -135,29 +142,9 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .badge-draft { background: var(--purple-dim); color: var(--purple); }
 .badge-open { background: var(--blue-dim); color: var(--blue); }
 
-/* Middle: title + meta */
-.pr-info { min-width: 0; }
-.pr-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pr-title a { color: inherit; text-decoration: none; }
-.pr-title a:hover { color: var(--blue); }
-.pr-meta {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--text2);
-}
-.pr-meta .sep { color: var(--text3); }
-.tag { display: inline-flex; align-items: center; gap: 3px; }
-.tag svg { opacity: 0.6; }
+/* Column cells */
+.cell { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
+.cell svg { flex-shrink: 0; opacity: 0.5; }
 .ci-pass { color: var(--green); }
 .ci-fail { color: var(--red); }
 .ci-pend { color: var(--yellow); }
@@ -174,90 +161,59 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .threads-warn { color: var(--yellow); font-weight: 600; }
 .threads-ok { color: var(--text3); }
 
-/* Right: actions */
-.pr-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.pr-title-cell {
+  min-width: 0; font-size: 13px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pr-title-cell a { color: var(--text); text-decoration: none; }
+.pr-title-cell a:hover { color: var(--blue); }
+.pr-branch { font-size: 11px; color: var(--text3); margin-top: 2px; font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .merge-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 14px;
-  border-radius: var(--radius);
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-  background: var(--green);
-  color: #fff;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: var(--radius); border: none;
+  font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  background: var(--green); color: #fff; white-space: nowrap;
 }
 .merge-btn:hover { background: #2ea043; box-shadow: 0 0 8px rgba(63,185,80,0.3); }
-.merge-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.merge-btn:disabled { opacity: 0.15; cursor: not-allowed; background: var(--text3); }
 .merge-btn.merging { background: var(--yellow); }
 
 /* ─── Alert Panel ─── */
 #alert-panel {
-  flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  background: var(--bg2);
-  max-height: 180px;
-  overflow-y: auto;
-  padding: 8px 24px;
+  flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg2);
+  max-height: 160px; overflow-y: auto; padding: 6px 24px;
 }
-#alert-panel:empty::before {
-  content: 'Waiting for events...';
-  color: var(--text3);
-  font-size: 12px;
-  font-style: italic;
-}
-.alert-entry {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 3px 0;
-  font-size: 12px;
-  line-height: 1.5;
-}
-.alert-ts { color: var(--text3); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
-.alert-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+#alert-panel:empty::before { content: 'Waiting for events...'; color: var(--text3); font-size: 11px; font-style: italic; }
+.alert-entry { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; font-size: 11px; line-height: 1.5; }
+.alert-ts { color: var(--text3); font-family: var(--mono); font-size: 10px; flex-shrink: 0; }
+.alert-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
 .alert-dot.success { background: var(--green); }
 .alert-dot.error { background: var(--red); }
 .alert-dot.warning { background: var(--yellow); }
 .alert-dot.info { background: var(--blue); }
 .alert-msg { color: var(--text2); }
 
-/* ─── Flash animation ─── */
+/* ─── Flash ─── */
 @keyframes cardFlash {
   0% { border-color: var(--blue); box-shadow: 0 0 12px var(--blue-dim); }
   100% { border-color: var(--border); box-shadow: none; }
 }
 .pr-card.flash { animation: cardFlash 2s ease-out; }
 
-/* ─── Empty state ─── */
 .empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 300px;
-  color: var(--text2);
-  font-size: 15px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; height: 300px; color: var(--text2); font-size: 15px;
 }
 .empty-state svg { opacity: 0.3; }
 
-/* ─── Webhook flash ─── */
 #wh-flash {
-  display: inline-block;
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: var(--blue);
-  opacity: 0;
-  transition: opacity 0.1s;
-  margin-left: 2px;
+  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--blue); opacity: 0; transition: opacity 0.1s; margin-left: 2px;
 }
 #wh-flash.on { opacity: 1; }
 
-/* ─── Scrollbar ─── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
@@ -271,13 +227,16 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></svg>
     <a id="repo-link" href="#" target="_blank"><span id="repo-name">PR Monitor</span></a>
   </span>
-  <span class="chip" id="pr-chip"><span id="pr-count">0</span> open</span>
+  <span class="chip"><span id="pr-count">0</span> open</span>
   <span class="spacer"></span>
   <span class="chip"><span class="dot" id="conn-dot"></span><span id="conn-label">...</span><span id="wh-flash"></span></span>
-  <button class="header-btn" id="voice-btn" onclick="toggleVoice()" title="Toggle voice alerts">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-    <span id="voice-label">Voice</span>
-  </button>
+  <span class="voice-group">
+    <button class="header-btn" id="voice-btn" onclick="toggleVoice()" title="Toggle voice alerts">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      <span id="voice-label">Voice</span>
+    </button>
+    <select class="voice-select" id="voice-select" onchange="selectVoice(this.value)" title="Select voice"></select>
+  </span>
   <button class="header-btn" onclick="doRefresh()" title="Refresh now">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
   </button>
@@ -288,38 +247,34 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
     <svg width="48" height="48" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></svg>
     Connecting...
   </div>
-  <div class="pr-list" id="pr-list" style="display:none"></div>
+  <div id="pr-container" style="display:none">
+    <div class="col-headers" id="col-headers">
+      <span>#</span><span>status</span><span>ci</span><span>merge</span><span>review</span><span>threads</span><span>reviewers</span><span>title</span><span></span>
+    </div>
+    <div class="pr-list" id="pr-list"></div>
+  </div>
 </main>
 
 <div id="alert-panel"></div>
 
 <script>
-// ── Icons (inline SVG) ──
 const IC = {
-  branch: '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Z"/></svg>',
   ci: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
   merge: '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8-9a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"/></svg>',
   review: '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 2.75a.25.25 0 0 1 .25-.25h8.5a.25.25 0 0 1 .25.25v5.5a.25.25 0 0 1-.25.25h-3.5a.75.75 0 0 0-.53.22L3.5 11.44V9.25a.75.75 0 0 0-.75-.75h-1a.25.25 0 0 1-.25-.25Zm.25-1.75A1.75 1.75 0 0 0 0 2.75v5.5C0 9.216.784 10 1.75 10H2v1.543a1.46 1.46 0 0 0 2.487 1.03L7.061 10h3.189A1.75 1.75 0 0 0 12 8.25v-5.5A1.75 1.75 0 0 0 10.25 1ZM14.5 4.75a.25.25 0 0 0-.25-.25h-.5a.75.75 0 0 1 0-1.5h.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 14.25 12H14v1.543a1.46 1.46 0 0 1-2.487 1.03L9.22 12.28a.75.75 0 0 1 1.06-1.06l2.22 2.22v-2.19a.75.75 0 0 1 .75-.75h1a.25.25 0 0 0 .25-.25Z"/></svg>',
   comment: '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0 1 13.25 12H9.06l-2.573 2.573A1.458 1.458 0 0 1 4 13.543V12H2.75A1.75 1.75 0 0 1 1 10.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h4.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>',
   people: '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4.001 4.001 0 0 0-6.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 4.6 8.049 3.5 3.5 0 0 1 2 5.5ZM5.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm5.5 0a.75.75 0 0 1 .75.75 2.25 2.25 0 1 0 2.25 2.25.75.75 0 0 1 1.5 0 3.75 3.75 0 0 1-6.652 2.387.75.75 0 0 1 1.081-.55A2.25 2.25 0 0 0 12.75 7 .75.75 0 0 1 11 4.75V4Z"/></svg>',
-  squash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/></svg>',
+  squash: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/></svg>',
 };
 
-// ── State ──
-let prs = [];
-let prevPrMap = new Map();
-let serverConfig = {};
-let voiceUnlocked = false;
-let voiceQueue = [];
-let speaking = false;
-let startedAt = 0;
-let evtSource = null;
+let prs = [], prevPrMap = new Map(), serverConfig = {};
+let voiceUnlocked = false, voiceQueue = [], speaking = false, selectedVoice = null;
+let startedAt = 0, evtSource = null;
 
 // ── SSE ──
 function connectSSE() {
   if (evtSource) evtSource.close();
   evtSource = new EventSource('/events');
-
   evtSource.addEventListener('init', (e) => {
     const d = JSON.parse(e.data);
     serverConfig = d.config || {};
@@ -332,13 +287,11 @@ function connectSSE() {
     document.getElementById('repo-link').href = `https://github.com/${serverConfig.repo}/pulls`;
     document.getElementById('pr-count').textContent = prs.length;
   });
-
   evtSource.addEventListener('state', (e) => {
     prs = JSON.parse(e.data).prs || [];
     renderPrs(prs, false);
     document.getElementById('pr-count').textContent = prs.length;
   });
-
   evtSource.addEventListener('alert', (e) => appendAlert(JSON.parse(e.data), true));
   evtSource.addEventListener('heartbeat', () => {});
   evtSource.addEventListener('webhook', () => flashWh());
@@ -353,16 +306,17 @@ function connectSSE() {
 
 // ── Render ──
 function renderPrs(list, initial) {
+  const container = document.getElementById('pr-container');
   const el = document.getElementById('pr-list');
   const empty = document.getElementById('empty-state');
 
   if (list.length === 0) {
-    el.style.display = 'none';
+    container.style.display = 'none';
     empty.style.display = 'flex';
     empty.textContent = 'No open PRs';
     return;
   }
-  el.style.display = '';
+  container.style.display = '';
   empty.style.display = 'none';
 
   const sorted = [...list].sort((a, b) => a.number - b.number);
@@ -378,36 +332,29 @@ function renderPrs(list, initial) {
 
     const allRevs = [...new Set([...(pr.reviewers || []), ...(pr.requestedReviewers || [])])].map(shortName).join(', ');
     const threadStr = pr.totalThreads > 0
-      ? `<span class="${pr.unresolvedThreads > 0 ? 'threads-warn' : 'threads-ok'}">${pr.totalThreads - pr.unresolvedThreads}/${pr.totalThreads}</span>`
-      : '<span class="threads-ok">0</span>';
+      ? `${pr.totalThreads - pr.unresolvedThreads}/${pr.totalThreads}`
+      : '0';
+    const threadClass = pr.unresolvedThreads > 0 ? 'threads-warn' : 'threads-ok';
 
     card.innerHTML = `
       <div class="pr-num"><a href="${esc(pr.url)}" target="_blank">#${pr.number}</a></div>
       <div>${statusBadge(pr)}</div>
-      <div class="pr-info">
-        <div class="pr-title"><a href="${esc(pr.url)}" target="_blank">${esc(pr.title)}</a></div>
-        <div class="pr-meta">
-          <span class="tag">${IC.branch} ${esc(pr.branch)}</span>
-          <span class="sep">&middot;</span>
-          <span class="tag ${ciClass(pr.ciStatus)}">${IC.ci} ${pr.ciStatus}</span>
-          <span class="sep">&middot;</span>
-          <span class="tag ${mergeClass(pr.mergeable, pr.mergeStateStatus)}">${IC.merge} ${mergeText(pr.mergeable, pr.mergeStateStatus)}</span>
-          <span class="sep">&middot;</span>
-          <span class="tag ${reviewClass(pr.reviewState)}">${IC.review} ${pr.reviewState}</span>
-          <span class="sep">&middot;</span>
-          <span class="tag">${IC.comment} ${threadStr}</span>
-          ${allRevs ? `<span class="sep">&middot;</span><span class="tag">${IC.people} ${esc(allRevs)}</span>` : ''}
-        </div>
+      <div class="cell ${ciClass(pr.ciStatus)}">${IC.ci} ${pr.ciStatus}</div>
+      <div class="cell ${mergeClass(pr.mergeable, pr.mergeStateStatus)}">${IC.merge} ${mergeText(pr.mergeable, pr.mergeStateStatus)}</div>
+      <div class="cell ${reviewClass(pr.reviewState)}">${IC.review} ${pr.reviewState}</div>
+      <div class="cell ${threadClass}">${IC.comment} ${threadStr}</div>
+      <div class="cell" style="color:var(--text2)" title="${esc(allRevs)}">${allRevs ? IC.people + ' ' + esc(allRevs) : '<span style="color:var(--text3)">&mdash;</span>'}</div>
+      <div class="pr-title-cell">
+        <a href="${esc(pr.url)}" target="_blank" title="${esc(pr.title)}">${esc(pr.title)}</a>
       </div>
-      <div class="pr-actions">
-        <button class="merge-btn" ${pr.isReady ? '' : 'disabled'} onclick="doMerge(${pr.number}, this)" title="${pr.isReady ? 'Squash and merge' : 'Not ready to merge'}">
+      <div style="text-align:right">
+        <button class="merge-btn" ${pr.isReady ? '' : 'disabled'} onclick="doMerge(${pr.number}, this)" title="${pr.isReady ? 'Squash and merge' : 'Not ready'}">
           ${IC.squash} Merge
         </button>
       </div>
     `;
     frag.appendChild(card);
   }
-
   el.replaceChildren(frag);
   prevPrMap = newMap;
 }
@@ -440,7 +387,7 @@ function mergeClass(m, s) {
 }
 function mergeText(m, s) {
   if (m === 'CONFLICTING') return 'conflict';
-  return { CLEAN:'clean', BEHIND:'behind', BLOCKED:'blocked', DIRTY:'dirty', UNSTABLE:'unstable', UNKNOWN:'—' }[s] || s;
+  return { CLEAN:'clean', BEHIND:'behind', BLOCKED:'blocked', DIRTY:'dirty', UNSTABLE:'unstable', UNKNOWN:'\u2014' }[s] || s;
 }
 function reviewClass(s) { return { approved:'review-approved', changes:'review-changes', pending:'review-pending', none:'review-none' }[s] || 'review-none'; }
 function shortName(l) { return l.startsWith('copilot') ? 'copilot' : l.split(/[-_.]/)[0]; }
@@ -450,20 +397,14 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s || 
 async function doMerge(num, btn) {
   btn.disabled = true;
   btn.classList.add('merging');
-  btn.innerHTML = IC.squash + ' Merging...';
+  btn.innerHTML = IC.squash + ' Merging\u2026';
   try {
     const r = await fetch(`/api/merge/${num}`, { method: 'POST' });
     const data = await r.json();
-    if (!data.ok) btn.innerHTML = IC.squash + ' Failed';
-    else btn.innerHTML = IC.squash + ' Merged!';
-  } catch {
-    btn.innerHTML = IC.squash + ' Error';
-  }
+    btn.innerHTML = data.ok ? (IC.squash + ' Merged!') : (IC.squash + ' Failed');
+  } catch { btn.innerHTML = IC.squash + ' Error'; }
 }
-
-function doRefresh() {
-  fetch('/api/refresh', { method: 'POST' });
-}
+function doRefresh() { fetch('/api/refresh', { method: 'POST' }); }
 
 // ── Alerts ──
 function appendAlert(a, live) {
@@ -478,20 +419,67 @@ function appendAlert(a, live) {
   if (live) { speakAlert(a.message); showNotif(a); }
 }
 
-// ── Voice ──
+// ── Voice with voice selector ──
+let voiceList = [];
+
+function loadVoices() {
+  if (!window.speechSynthesis) return;
+  const populate = () => {
+    voiceList = speechSynthesis.getVoices();
+    if (!voiceList.length) return;
+    // Sort: premium first, then by name
+    voiceList.sort((a, b) => {
+      const ap = isPremium(a), bp = isPremium(b);
+      if (ap && !bp) return -1;
+      if (!ap && bp) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    const sel = document.getElementById('voice-select');
+    sel.innerHTML = '';
+    for (const v of voiceList) {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      const tag = isPremium(v) ? ' \u2605' : '';
+      opt.textContent = `${v.name}${tag}`;
+      sel.appendChild(opt);
+    }
+    // Auto-select best premium english voice
+    if (!selectedVoice) {
+      const best = voiceList.find(v => isPremium(v) && v.lang.startsWith('en')) || voiceList.find(v => v.lang.startsWith('en')) || voiceList[0];
+      if (best) { selectedVoice = best; sel.value = best.name; }
+    }
+  };
+  populate();
+  speechSynthesis.onvoiceschanged = populate;
+}
+
+function isPremium(v) {
+  const n = v.name.toLowerCase();
+  return n.includes('premium') || n.includes('enhanced') || n.includes('natural')
+    || n.includes('neural') || n.includes('wavenet') || n.includes('google');
+}
+
+function selectVoice(name) {
+  selectedVoice = voiceList.find(v => v.name === name) || null;
+}
+
 function toggleVoice() {
   const btn = document.getElementById('voice-btn');
   if (!window.speechSynthesis) return;
   if (voiceUnlocked) {
     voiceUnlocked = false;
+    speechSynthesis.cancel();
     btn.classList.remove('active');
   } else {
     voiceUnlocked = true;
     btn.classList.add('active');
-    speechSynthesis.speak(new SpeechSynthesisUtterance('PR monitor active'));
+    const u = new SpeechSynthesisUtterance('PR monitor active');
+    if (selectedVoice) u.voice = selectedVoice;
+    speechSynthesis.speak(u);
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
   }
 }
+
 function speakAlert(msg) {
   if (!voiceUnlocked || serverConfig.noVoice || !window.speechSynthesis) return;
   voiceQueue.push(msg);
@@ -501,6 +489,8 @@ function drainVoice() {
   if (speaking || !voiceQueue.length) return;
   speaking = true;
   const u = new SpeechSynthesisUtterance(voiceQueue.shift());
+  if (selectedVoice) u.voice = selectedVoice;
+  u.rate = 1.0;
   u.onend = u.onerror = () => { speaking = false; drainVoice(); };
   speechSynthesis.speak(u);
 }
@@ -511,12 +501,10 @@ function showNotif(a) {
   new Notification(`PR #${a.prNumber}`, { body: a.message, tag: 'pr-' + a.prNumber, silent: true });
 }
 
-// ── Connection status ──
+// ── Connection ──
 function setConn(s) {
-  const dot = document.getElementById('conn-dot');
-  const label = document.getElementById('conn-label');
-  dot.className = 'dot ' + { live:'green', polling:'yellow', disconnected:'red' }[s];
-  label.textContent = { live:'Live', polling:'Polling', disconnected:'Offline' }[s] || s;
+  document.getElementById('conn-dot').className = 'dot ' + { live:'green', polling:'yellow', disconnected:'red' }[s];
+  document.getElementById('conn-label').textContent = { live:'Live', polling:'Polling', disconnected:'Offline' }[s] || s;
 }
 let whTimer;
 function flashWh() {
@@ -527,6 +515,7 @@ function flashWh() {
 }
 
 // ── Init ──
+loadVoices();
 connectSSE();
 </script>
 </body>
