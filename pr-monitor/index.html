@@ -1,16 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="theme-dark size-l font-fira">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PR Monitor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+// Apply settings BEFORE first render to avoid flash
+(function() {
+  var t = localStorage.getItem('pr-monitor-theme') || 'dark';
+  var s = localStorage.getItem('pr-monitor-size') || 'l';
+  var f = localStorage.getItem('pr-monitor-font') || 'fira';
+  var themeClass = t;
+  if (t === 'system') {
+    themeClass = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  document.documentElement.className = 'theme-' + themeClass + ' size-' + s + ' font-' + f;
+  document.documentElement.dataset.theme = t;
+})();
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
+/* ─── Theme: Dark (default — original colors) ─── */
+html.theme-dark {
   --bg: #0d1117;
   --bg2: #161b22;
   --bg3: #21262d;
@@ -29,19 +44,61 @@
   --blue-dim: rgba(88,166,255,0.12);
   --purple: #bc8cff;
   --purple-dim: rgba(188,140,255,0.1);
+}
+
+/* ─── Theme: Light ─── */
+html.theme-light {
+  --bg: #ffffff;
+  --bg2: #f6f8fa;
+  --bg3: #f0f2f5;
+  --bg4: #e4e7eb;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --text2: #656d76;
+  --text3: #8b949e;
+  --green: #1a7f37;
+  --green-dim: rgba(26,127,55,0.12);
+  --red: #cf222e;
+  --red-dim: rgba(207,34,46,0.12);
+  --yellow: #9a6700;
+  --yellow-dim: rgba(154,103,0,0.12);
+  --blue: #0969da;
+  --blue-dim: rgba(9,105,218,0.12);
+  --purple: #8250df;
+  --purple-dim: rgba(130,80,223,0.12);
+}
+
+/* ─── Font families ─── */
+html {
   --font: 'Fira Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  --font-ui: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   --mono: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  --font-ui: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   --radius: 6px;
   --radius-lg: 10px;
 }
+html.font-system {
+  --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+}
+html.font-fira {
+  --font: 'Fira Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+}
+html.font-inter {
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+}
+html.font-plex {
+  --font: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'IBM Plex Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+}
 
-/* ─── Scalable theme via custom properties ─── */
-html { --scale: 14px; --density: 12px; }
-html.size-s { --scale: 12px; --density: 8px; }
-html.size-m { --scale: 14px; --density: 12px; }
-html.size-l { --scale: 16px; --density: 14px; }
-html.size-xl { --scale: 18px; --density: 16px; }
+/* ─── Scalable sizing via custom properties ─── */
+html { --scale: 14px; --density: 12px; --card-radius: 10px; }
+html.size-s  { --scale: 12px; --density: 8px; --card-radius: 8px; }
+html.size-m  { --scale: 14px; --density: 12px; --card-radius: 10px; }
+html.size-l  { --scale: 16px; --density: 14px; --card-radius: 12px; }
+html.size-xl { --scale: 18px; --density: 16px; --card-radius: 14px; }
 
 html, body { height: 100%; }
 body {
@@ -131,7 +188,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   padding: var(--density) 18px;
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--card-radius);
   transition: border-color 0.15s, background 0.15s;
 }
 .pr-card:hover { border-color: var(--text3); background: var(--bg3); }
@@ -287,31 +344,84 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 }
 .settings-overlay.open { display: flex; justify-content: flex-end; }
 .settings-panel {
-  width: 320px; height: 100%; background: var(--bg2); border-left: 1px solid var(--border);
-  padding: 24px; overflow-y: auto; font-family: var(--font-ui);
-  animation: slideIn 0.15s ease-out;
+  width: 380px; height: 100%; background: var(--bg2); border-left: 1px solid var(--border);
+  padding: 28px 24px; overflow-y: auto; font-family: var(--font-ui);
+  animation: slideIn 0.2s ease-out;
+  position: relative;
 }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-.settings-panel h2 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 20px; }
-.settings-section { margin-bottom: 20px; }
+.settings-panel h2 {
+  font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 24px;
+  display: flex; align-items: center; gap: 8px;
+}
+.settings-panel h2 svg { opacity: 0.5; }
+.settings-section { margin-bottom: 24px; }
+.settings-section:not(:last-child) { padding-bottom: 24px; border-bottom: 1px solid var(--border); }
 .settings-section label {
-  display: block; font-size: 11px; font-weight: 500; color: var(--text2);
-  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  display: block; font-size: 11px; font-weight: 600; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
 }
-.size-options { display: flex; gap: 6px; }
-.size-opt {
-  flex: 1; padding: 8px 0; text-align: center; border-radius: var(--radius);
-  border: 1px solid var(--border); background: var(--bg); color: var(--text2);
-  font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s;
-  font-family: var(--font-ui);
-}
-.size-opt:hover { border-color: var(--text3); color: var(--text); }
-.size-opt.active { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
 .settings-close {
-  position: absolute; top: 16px; right: 16px; background: none; border: none;
-  color: var(--text2); cursor: pointer; font-size: 18px; padding: 4px;
+  position: absolute; top: 20px; right: 20px; background: none; border: none;
+  color: var(--text3); cursor: pointer; font-size: 20px; padding: 4px 8px;
+  border-radius: var(--radius); transition: all 0.15s; line-height: 1;
 }
-.settings-close:hover { color: var(--text); }
+.settings-close:hover { color: var(--text); background: var(--bg3); }
+
+/* Segmented control */
+.seg-control {
+  display: inline-flex; border-radius: 8px; padding: 2px;
+  background: var(--bg); border: 1px solid var(--border);
+  width: 100%;
+}
+.seg-opt {
+  flex: 1; padding: 6px 14px; border-radius: 6px; border: none;
+  background: transparent; color: var(--text2); font-size: 12px;
+  font-weight: 500; cursor: pointer; transition: all 0.15s;
+  font-family: var(--font-ui); text-align: center;
+}
+.seg-opt:hover { color: var(--text); }
+.seg-opt.active { background: var(--bg3); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+/* Font radio cards */
+.font-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.font-card {
+  padding: 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); cursor: pointer; transition: all 0.15s;
+}
+.font-card:hover { border-color: var(--text3); }
+.font-card.active { border-color: var(--blue); background: var(--blue-dim); }
+.font-card .font-name {
+  font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.font-card .font-name .check {
+  display: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--blue); color: #fff; font-size: 9px;
+  align-items: center; justify-content: center; line-height: 1;
+}
+.font-card.active .font-name .check { display: inline-flex; }
+.font-card .font-preview { font-size: 16px; color: var(--text); line-height: 1.3; }
+.font-card .font-mono-preview { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+/* Preview section */
+.settings-preview {
+  padding: 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); font-size: 13px; color: var(--text2); line-height: 1.6;
+}
+.settings-preview .preview-heading {
+  font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px;
+  font-family: var(--font);
+}
+.settings-preview .preview-body {
+  font-family: var(--font); font-size: 13px;
+}
+.settings-preview .preview-mono {
+  font-family: var(--mono); font-size: 12px; color: var(--text3);
+  background: var(--bg3); padding: 2px 6px; border-radius: 4px; margin-top: 6px;
+  display: inline-block;
+}
 </style>
 </head>
 <body>
@@ -345,16 +455,64 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 </header>
 
 <div class="settings-overlay" id="settings-overlay" onclick="if(event.target===this)toggleSettings()">
-  <div class="settings-panel" style="position:relative">
+  <div class="settings-panel">
     <button class="settings-close" onclick="toggleSettings()">&times;</button>
-    <h2>Appearance</h2>
+    <h2>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Appearance
+    </h2>
+
+    <div class="settings-section">
+      <label>Theme</label>
+      <div class="seg-control" id="theme-control">
+        <button class="seg-opt" data-theme="dark" onclick="setTheme('dark')">Dark</button>
+        <button class="seg-opt" data-theme="light" onclick="setTheme('light')">Light</button>
+        <button class="seg-opt" data-theme="system" onclick="setTheme('system')">System</button>
+      </div>
+    </div>
+
     <div class="settings-section">
       <label>Text Size</label>
-      <div class="size-options" id="size-options">
-        <button class="size-opt" data-size="s" onclick="setSize('s')">S</button>
-        <button class="size-opt" data-size="m" onclick="setSize('m')">M</button>
-        <button class="size-opt" data-size="l" onclick="setSize('l')">L</button>
-        <button class="size-opt" data-size="xl" onclick="setSize('xl')">XL</button>
+      <div class="seg-control" id="size-control">
+        <button class="seg-opt" data-size="s" onclick="setSize('s')">S</button>
+        <button class="seg-opt" data-size="m" onclick="setSize('m')">M</button>
+        <button class="seg-opt" data-size="l" onclick="setSize('l')">L</button>
+        <button class="seg-opt" data-size="xl" onclick="setSize('xl')">XL</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <label>Font Family</label>
+      <div class="font-grid" id="font-grid">
+        <div class="font-card" data-font="system" onclick="setFont('system')">
+          <div class="font-name">System <span class="check">&#10003;</span></div>
+          <div class="font-preview" style="font-family: system-ui, sans-serif">Aa Bb Cc</div>
+          <div class="font-mono-preview" style="font-family: ui-monospace, monospace">0x1F4A9</div>
+        </div>
+        <div class="font-card" data-font="fira" onclick="setFont('fira')">
+          <div class="font-name">Fira Sans <span class="check">&#10003;</span></div>
+          <div class="font-preview" style="font-family: 'Fira Sans', sans-serif">Aa Bb Cc</div>
+          <div class="font-mono-preview" style="font-family: 'SF Mono', SFMono-Regular, monospace">0x1F4A9</div>
+        </div>
+        <div class="font-card" data-font="inter" onclick="setFont('inter')">
+          <div class="font-name">Inter <span class="check">&#10003;</span></div>
+          <div class="font-preview" style="font-family: 'Inter', sans-serif">Aa Bb Cc</div>
+          <div class="font-mono-preview" style="font-family: 'JetBrains Mono', monospace">0x1F4A9</div>
+        </div>
+        <div class="font-card" data-font="plex" onclick="setFont('plex')">
+          <div class="font-name">IBM Plex <span class="check">&#10003;</span></div>
+          <div class="font-preview" style="font-family: 'IBM Plex Sans', sans-serif">Aa Bb Cc</div>
+          <div class="font-mono-preview" style="font-family: 'IBM Plex Mono', monospace">0x1F4A9</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <label>Preview</label>
+      <div class="settings-preview">
+        <div class="preview-heading">The quick brown fox</div>
+        <div class="preview-body">jumps over the lazy dog. Pack my box with five dozen liquor jugs.</div>
+        <div class="preview-mono">const x = [1, 2, 3].map(n => n * 2);</div>
       </div>
     </div>
   </div>
@@ -831,16 +989,91 @@ function toggleSettings() {
   document.getElementById('settings-overlay').classList.toggle('open');
 }
 
+// Helper to rebuild html classes from current settings
+function rebuildHtmlClasses() {
+  var theme = document.documentElement.dataset.theme || 'dark';
+  var size = document.documentElement.dataset.size || 'l';
+  var font = document.documentElement.dataset.font || 'fira';
+  var themeClass = theme;
+  if (theme === 'system') {
+    themeClass = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  document.documentElement.className = 'theme-' + themeClass + ' size-' + size + ' font-' + font;
+  // Preserve data attributes
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.size = size;
+  document.documentElement.dataset.font = font;
+}
+
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  rebuildHtmlClasses();
+  // Update segmented control active state
+  document.querySelectorAll('#theme-control .seg-opt').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.theme === theme);
+  });
+  try { localStorage.setItem('pr-monitor-theme', theme); } catch {}
+  // Set up or tear down system theme listener
+  setupSystemThemeListener();
+}
+
 function setSize(size) {
-  document.documentElement.className = 'size-' + size;
-  document.querySelectorAll('.size-opt').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+  document.documentElement.dataset.size = size;
+  rebuildHtmlClasses();
+  document.querySelectorAll('#size-control .seg-opt').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.size === size);
+  });
   try { localStorage.setItem('pr-monitor-size', size); } catch {}
 }
 
-// Restore saved size
+function setFont(font) {
+  document.documentElement.dataset.font = font;
+  rebuildHtmlClasses();
+  document.querySelectorAll('#font-grid .font-card').forEach(function(c) {
+    c.classList.toggle('active', c.dataset.font === font);
+  });
+  try { localStorage.setItem('pr-monitor-font', font); } catch {}
+}
+
+// System theme listener
+var systemThemeMql = window.matchMedia('(prefers-color-scheme: dark)');
+function onSystemThemeChange(e) {
+  if (document.documentElement.dataset.theme === 'system') {
+    rebuildHtmlClasses();
+  }
+}
+function setupSystemThemeListener() {
+  // Always listen — the handler checks if we're in system mode
+  systemThemeMql.removeEventListener('change', onSystemThemeChange);
+  systemThemeMql.addEventListener('change', onSystemThemeChange);
+}
+
+// Restore all settings and sync UI controls
 (function() {
-  const saved = localStorage.getItem('pr-monitor-size') || 'l';
-  setSize(saved);
+  var savedTheme = localStorage.getItem('pr-monitor-theme') || 'dark';
+  var savedSize = localStorage.getItem('pr-monitor-size') || 'l';
+  var savedFont = localStorage.getItem('pr-monitor-font') || 'fira';
+
+  // Store in data attributes
+  document.documentElement.dataset.theme = savedTheme;
+  document.documentElement.dataset.size = savedSize;
+  document.documentElement.dataset.font = savedFont;
+  rebuildHtmlClasses();
+
+  // Sync theme control
+  document.querySelectorAll('#theme-control .seg-opt').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.theme === savedTheme);
+  });
+  // Sync size control
+  document.querySelectorAll('#size-control .seg-opt').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.size === savedSize);
+  });
+  // Sync font cards
+  document.querySelectorAll('#font-grid .font-card').forEach(function(c) {
+    c.classList.toggle('active', c.dataset.font === savedFont);
+  });
+
+  setupSystemThemeListener();
 })();
 
 // ── Init ──
