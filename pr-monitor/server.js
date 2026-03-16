@@ -120,7 +120,8 @@ async function checkPrereqs() {
 const prStore = new Map();
 const alertLog = [];
 const MAX_ALERTS = 50;
-const STILL_THRESHOLD_MS = 120_000;
+const STILL_THRESHOLD_MS = 60_000;
+const STILL_REPEAT_MS = 60_000;
 
 function makePrState(raw) {
   return {
@@ -145,7 +146,7 @@ function makePrState(raw) {
     _prev: null,
     _announced: { created: false, conflicts: false, ciFail: false, noReview: false, ready: false },
     _issueSinceEpoch: 0,
-    _announcedStill: false,
+    _lastStillEpoch: 0,
   };
 }
 
@@ -329,14 +330,16 @@ function detectTransitions(pr) {
     : isBehind ? 'behind' : '';
 
   if (hasIssue) {
-    if (pr._issueSinceEpoch === 0) { pr._issueSinceEpoch = Date.now(); pr._announcedStill = false; }
-    if (!pr._announcedStill && (Date.now() - pr._issueSinceEpoch) >= STILL_THRESHOLD_MS) {
-      pr._announcedStill = true;
+    if (pr._issueSinceEpoch === 0) { pr._issueSinceEpoch = Date.now(); pr._lastStillEpoch = 0; }
+    const issueAge = Date.now() - pr._issueSinceEpoch;
+    const sinceLast = Date.now() - (pr._lastStillEpoch || 0);
+    if (issueAge >= STILL_THRESHOLD_MS && sinceLast >= STILL_REPEAT_MS) {
+      pr._lastStillEpoch = Date.now();
       alert('warning', `${num} still ${issueDesc}`);
     }
   } else {
     pr._issueSinceEpoch = 0;
-    pr._announcedStill = false;
+    pr._lastStillEpoch = 0;
   }
 
   return alerts;
