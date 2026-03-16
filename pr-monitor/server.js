@@ -723,7 +723,9 @@ function routeWebhookEvent(eventType, payload) {
 // HTTP Server
 // ---------------------------------------------------------------------------
 
-const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const BUILD_VERSION = new Date().toISOString().replace('T', ' ').slice(0, 16);
+const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8')
+  .replace('__BUILD_VERSION__', BUILD_VERSION);
 
 function requestHandler(req, res) {
   const url = req.url?.split('?')[0];
