@@ -166,7 +166,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 /* ─── Column headers ─── */
 .col-headers {
   display: grid;
-  grid-template-columns: 34px 20px 1fr 150px 110px 120px 32px 80px;
+  grid-template-columns: 34px 20px 20px 1fr 150px 110px 120px 32px 80px;
   gap: 8px;
   padding: 0 18px 6px;
   font-size: 10px;
@@ -181,7 +181,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .pr-list { display: flex; flex-direction: column; gap: 6px; }
 .pr-card {
   display: grid;
-  grid-template-columns: 34px 20px 1fr 150px 110px 120px 32px 80px;
+  grid-template-columns: 34px 20px 20px 1fr 150px 110px 120px 32px 80px;
   align-items: center;
   gap: var(--density);
   column-gap: 4px;
@@ -422,6 +422,21 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   background: var(--bg3); padding: 2px 6px; border-radius: 4px; margin-top: 6px;
   display: inline-block;
 }
+
+/* ─── Resizable section dividers ─── */
+.resize-handle {
+  height: 6px; cursor: row-resize; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.resize-handle::after {
+  content: ''; width: 32px; height: 2px; border-radius: 1px; background: var(--text3); opacity: 0.4;
+}
+.resize-handle:hover::after { opacity: 0.8; }
+
+/* Agent icon */
+.agent-icon { text-align: center; font-size: 13px; line-height: 1; }
+.agent-icon img { width: 16px; height: 16px; border-radius: 3px; vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -525,11 +540,13 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   </div>
   <div id="pr-container" style="display:none">
     <div class="col-headers" id="col-headers">
-      <span>#</span><span></span><span>title</span><span>review</span><span>reviewers</span><span>status</span><span>ci</span><span>merge</span>
+      <span>#</span><span></span><span></span><span>title</span><span>review</span><span>reviewers</span><span>status</span><span>ci</span><span>merge</span>
     </div>
     <div class="pr-list" id="pr-list"></div>
   </div>
 </main>
+
+<div class="resize-handle" data-resize="pr-deploy"></div>
 
 <div id="deploy-section" class="hidden">
   <div class="deploy-header">
@@ -538,6 +555,8 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   </div>
   <div class="deploy-list" id="deploy-list"></div>
 </div>
+
+<div class="resize-handle" data-resize="deploy-alerts"></div>
 
 <div id="alert-panel"></div>
 
@@ -636,6 +655,7 @@ function renderPrs(list, initial) {
     card.innerHTML = `
       <div class="pr-num"><a href="${esc(pr.url)}" target="_blank">#${pr.number}</a></div>
       <div class="size-${(pr.sizeLabel||'xs').toLowerCase()}" title="${pr.additions}+ ${pr.deletions}- ${pr.changedFiles} files" style="font-size:16px;text-align:center;line-height:1">${sizeIcon(pr.sizeLabel)}</div>
+      <div class="agent-icon" title="${esc(pr.branch)}">${agentIcon(pr.branch)}</div>
       <div class="pr-title-cell">
         <a href="${esc(pr.url)}" target="_blank" title="${esc(pr.title)}">${esc(pr.title)}</a>
         <div class="pr-branch">${esc(pr.branch)}</div>
@@ -720,6 +740,18 @@ function sizeIcon(label) {
   // Vertical bars: more bars = bigger PR
   const bars = { XS: '\u2581', S: '\u2582', M: '\u2584', L: '\u2586', XL: '\u2588' };
   return (bars[label] || '\u2581');
+}
+function agentIcon(branch) {
+  const b = (branch || '').toLowerCase();
+  if (b.startsWith('claude/') || b.startsWith('claude-'))
+    return '<img src="https://cdn.simpleicons.org/anthropic/d4a27f" alt="Claude" title="Claude">';
+  if (b.startsWith('codex/') || b.startsWith('codex-') || b.startsWith('openai/'))
+    return '<img src="https://cdn.simpleicons.org/openai/74aa9c" alt="Codex" title="Codex">';
+  if (b.startsWith('copilot/') || b.startsWith('copilot-'))
+    return '<img src="https://cdn.simpleicons.org/github/8b949e" alt="Copilot" title="Copilot">';
+  if (b.startsWith('devin/') || b.startsWith('devin-'))
+    return '<img src="https://cdn.simpleicons.org/cognizant/58a6ff" alt="Devin" title="Devin">';
+  return '';
 }
 function shortName(l) { return l.startsWith('copilot') ? 'copilot' : l.split(/[-_.]/)[0]; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -983,6 +1015,35 @@ function selectDeployVoice(name) {
   selectedDeployVoice = voices.find(v => v.name === name) || null;
   try { localStorage.setItem('pr-monitor-deploy-voice', name); } catch {}
 }
+
+// ── Resize handles ──
+document.querySelectorAll('.resize-handle').forEach(handle => {
+  let startY, startH, target;
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const section = handle.previousElementSibling;
+    if (!section) return;
+    target = section.tagName === 'MAIN' ? section : section;
+    startY = e.clientY;
+    startH = target.getBoundingClientRect().height;
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  });
+  function onDrag(e) {
+    const delta = e.clientY - startY;
+    target.style.height = Math.max(60, startH + delta) + 'px';
+    target.style.flex = 'none';
+    target.style.overflow = 'auto';
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+});
 
 // ── Settings ──
 function toggleSettings() {
