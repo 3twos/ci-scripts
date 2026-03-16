@@ -2,6 +2,7 @@
 'use strict';
 
 const http = require('node:http');
+const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFile, spawn } = require('node:child_process');
@@ -20,6 +21,13 @@ const config = {
   autoUpdate: false,
   noVoice: false,
   noWebhook: false,
+  vercelRepo: '',
+  vercelToken: '',
+  vercelTeamId: '',
+  vercelProjectId: '',
+  vercelProjectName: '',
+  maxDeployments: 6,
+  deployInterval: 15,
 };
 
 function usage() {
@@ -38,6 +46,13 @@ Options:
   --auto-update          Auto-update PRs behind base branch
   --no-voice             Disable voice alerts in browser
   --no-webhook           Skip webhook forwarder, polling only
+
+Vercel deployment monitoring:
+  --vercel-repo <path>   Path to repo with .vercel/project.json
+  --vercel-token <token> Vercel API token (falls back to macOS Keychain)
+  --vercel-team-id <id>  Vercel team/org ID
+  --vercel-project-id <id> Vercel project ID
+  --deploy-interval <s>  Deployment poll interval in seconds (default: 15)
   -h, --help             Show this help
 `.trim());
 }
@@ -56,6 +71,11 @@ function parseArgs(argv) {
       case '--auto-update': config.autoUpdate = true; break;
       case '--no-voice': config.noVoice = true; break;
       case '--no-webhook': config.noWebhook = true; break;
+      case '--vercel-repo': config.vercelRepo = args[++i] || ''; break;
+      case '--vercel-token': config.vercelToken = args[++i] || ''; break;
+      case '--vercel-team-id': config.vercelTeamId = args[++i] || ''; break;
+      case '--vercel-project-id': config.vercelProjectId = args[++i] || ''; break;
+      case '--deploy-interval': config.deployInterval = parseInt(args[++i], 10) || 15; break;
       default:
         // Positional: treat as repo if it looks like owner/repo
         if (!config.repo && args[i].includes('/') && !args[i].startsWith('-')) {
@@ -484,6 +504,331 @@ function scheduleUpdateCheck(number) {
 }
 
 // ---------------------------------------------------------------------------
+// Vercel Deployment Store
+// ---------------------------------------------------------------------------
+
+const deployStore = new Map(); // id -> deployment state
+const deployAlertLog = [];
+const MAX_DEPLOY_ALERTS = 50;
+const activeStreams = new Map(); // deploymentId -> https.ClientRequest
+
+function makeDeploymentState(raw) {
+  return {
+    id: raw.uid || raw.id || '',
+    status: raw.state || raw.readyState || 'QUEUED',
+    url: raw.url ? `https://${raw.url}` : '',
+    createdAtMs: raw.createdAt || raw.created || Date.now(),
+    readyAtMs: raw.ready || 0,
+    target: raw.target || 'preview',
+    branch: raw.meta?.githubCommitRef || raw.meta?.branch || '',
+    errorMessage: raw.errorMessage || '',
+    source: raw.source || '',
+    actor: raw.creator?.username || '',
+    commitSha: raw.meta?.githubCommitSha || '',
+    changeTitle: raw.meta?.githubCommitMessage || '',
+    pullRequest: raw.meta?.githubPrId || null,
+    step: '',
+    lastEventMs: 0,
+    _lastStatus: '',
+    _terminalAnnounced: false,
+  };
+}
+
+function serializeDeployment(dep) {
+  const now = Date.now();
+  const endMs = dep.readyAtMs || (isTerminalDeployStatus(dep.status) ? dep.lastEventMs || now : now);
+  const durationSeconds = Math.round((endMs - dep.createdAtMs) / 1000);
+  return {
+    id: dep.id,
+    status: dep.status,
+    url: dep.url,
+    createdAtMs: dep.createdAtMs,
+    readyAtMs: dep.readyAtMs,
+    target: dep.target,
+    branch: dep.branch,
+    errorMessage: dep.errorMessage,
+    changeTitle: dep.changeTitle,
+    pullRequest: dep.pullRequest,
+    step: dep.step,
+    durationSeconds: durationSeconds > 0 ? durationSeconds : 0,
+  };
+}
+
+function isTerminalDeployStatus(status) {
+  return ['READY', 'ERROR', 'CANCELED'].includes(status);
+}
+
+function formatSpokenDuration(seconds) {
+  if (seconds < 60) return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+  const m = Math.floor(seconds / 60), s = seconds % 60;
+  let r = `${m} minute${m !== 1 ? 's' : ''}`;
+  if (s > 0) r += ` ${s} second${s !== 1 ? 's' : ''}`;
+  return r;
+}
+
+function deployAlert(level, message) {
+  // Deduplicate: skip if same message within 30s
+  const recent = deployAlertLog.filter(a => a.message === message && (Date.now() - a.ts) < 30_000);
+  if (recent.length > 0) return null;
+  const a = { ts: Date.now(), level, message };
+  deployAlertLog.push(a);
+  if (deployAlertLog.length > MAX_DEPLOY_ALERTS) deployAlertLog.shift();
+  return a;
+}
+
+// ---------------------------------------------------------------------------
+// Vercel API
+// ---------------------------------------------------------------------------
+
+function vercelFetch(urlPath) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlPath, 'https://api.vercel.com');
+    const options = {
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${config.vercelToken}`,
+        'Content-Type': 'application/json',
+      },
+    };
+    const req = https.get(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 400) {
+          reject(new Error(`Vercel API ${res.statusCode}: ${body.slice(0, 200)}`));
+          return;
+        }
+        try { resolve(JSON.parse(body)); }
+        catch (e) { reject(new Error(`Vercel API JSON parse error: ${e.message}`)); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Vercel API timeout')); });
+  });
+}
+
+async function fetchDeployments() {
+  let urlPath = `/v6/deployments?projectId=${config.vercelProjectId}&limit=${config.maxDeployments}`;
+  if (config.vercelTeamId) urlPath += `&teamId=${config.vercelTeamId}`;
+  const data = await vercelFetch(urlPath);
+  return data.deployments || [];
+}
+
+function startDeploymentStream(deploymentId) {
+  if (activeStreams.has(deploymentId)) return;
+
+  let reconnectAttempts = 0;
+  const maxReconnects = 5;
+
+  function connect() {
+    let urlPath = `/v3/deployments/${deploymentId}/events?follow=1&builds=1`;
+    if (config.vercelTeamId) urlPath += `&teamId=${config.vercelTeamId}`;
+    const url = new URL(urlPath, 'https://api.vercel.com');
+
+    const options = {
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${config.vercelToken}`,
+      },
+    };
+
+    const req = https.get(options, (res) => {
+      if (res.statusCode >= 400) {
+        log(`[deploy] Stream ${deploymentId} HTTP ${res.statusCode}`);
+        activeStreams.delete(deploymentId);
+        return;
+      }
+
+      let buffer = '';
+      res.on('data', (chunk) => {
+        buffer += chunk.toString();
+        // Parse line-delimited JSON objects
+        let startIdx = 0;
+        for (let i = 0; i < buffer.length; i++) {
+          if (buffer[i] === '\n') {
+            const line = buffer.slice(startIdx, i).trim();
+            startIdx = i + 1;
+            if (line.length > 0) {
+              try {
+                const event = JSON.parse(line);
+                handleDeploymentEvent(deploymentId, event);
+              } catch {
+                // Not valid JSON yet, could be partial — try brace matching
+              }
+            }
+          }
+        }
+        buffer = buffer.slice(startIdx);
+      });
+
+      res.on('end', () => {
+        activeStreams.delete(deploymentId);
+        const dep = deployStore.get(deploymentId);
+        if (dep && !isTerminalDeployStatus(dep.status)) {
+          // Reconnect with backoff
+          reconnectAttempts++;
+          if (reconnectAttempts <= maxReconnects) {
+            const delay = Math.min(2000 * reconnectAttempts, 15000);
+            log(`[deploy] Stream ${deploymentId} disconnected, reconnecting in ${delay / 1000}s...`);
+            setTimeout(connect, delay);
+          }
+        }
+      });
+
+      res.on('error', () => {
+        activeStreams.delete(deploymentId);
+      });
+    });
+
+    req.on('error', (err) => {
+      log(`[deploy] Stream error for ${deploymentId}: ${err.message}`);
+      activeStreams.delete(deploymentId);
+    });
+
+    req.setTimeout(0); // No timeout for streaming
+    activeStreams.set(deploymentId, req);
+  }
+
+  connect();
+}
+
+function handleDeploymentEvent(deploymentId, event) {
+  const dep = deployStore.get(deploymentId);
+  if (!dep) return;
+
+  dep.lastEventMs = event.created || Date.now();
+
+  // Extract readyState from payload
+  const readyState = event.payload?.readyState;
+  const step = event.payload?.info?.step || event.payload?.name || '';
+
+  if (step) dep.step = step;
+
+  if (readyState) {
+    const newStatus = readyState.toUpperCase();
+    if (newStatus !== dep._lastStatus) {
+      dep._lastStatus = newStatus;
+      dep.status = newStatus;
+
+      // Detect terminal states and fire alerts
+      if (isTerminalDeployStatus(newStatus) && !dep._terminalAnnounced) {
+        dep._terminalAnnounced = true;
+        if (newStatus === 'READY') dep.readyAtMs = dep.lastEventMs;
+        announceDeploymentTerminal(dep);
+      }
+
+      broadcastDeployments();
+    }
+  } else {
+    // Non-state events — still broadcast step changes
+    broadcastDeployments();
+  }
+}
+
+function announceDeploymentTerminal(dep) {
+  const durationSec = Math.round(((dep.readyAtMs || dep.lastEventMs || Date.now()) - dep.createdAtMs) / 1000);
+  const duration = formatSpokenDuration(durationSec);
+  const env = dep.target === 'production' ? 'Main' : `PR #${dep.pullRequest || dep.branch}`;
+  const title = dep.changeTitle ? ` ${dep.changeTitle.split('\n')[0].slice(0, 80)}` : '';
+
+  let a;
+  switch (dep.status) {
+    case 'READY':
+      a = deployAlert('success', `Deployed ${env}${title} in ${duration}`);
+      break;
+    case 'ERROR':
+      a = deployAlert('error', `${env} deployment failed after ${duration}. ${dep.errorMessage || ''}`);
+      break;
+    case 'CANCELED':
+      a = deployAlert('warning', `${env} deployment canceled`);
+      break;
+  }
+  if (a) broadcastDeployAlert(a);
+}
+
+// ---------------------------------------------------------------------------
+// Deployment Refresh Logic
+// ---------------------------------------------------------------------------
+
+let deployRefreshing = false;
+
+async function refreshDeployments() {
+  if (!config.vercelToken || !config.vercelProjectId) return;
+  if (deployRefreshing) return;
+  deployRefreshing = true;
+
+  try {
+    const rawList = await fetchDeployments();
+    const fetchedIds = new Set(rawList.map(d => d.uid || d.id));
+
+    // Remove old deployments no longer in the list
+    for (const id of deployStore.keys()) {
+      if (!fetchedIds.has(id)) {
+        const stream = activeStreams.get(id);
+        if (stream) { stream.destroy(); activeStreams.delete(id); }
+        deployStore.delete(id);
+      }
+    }
+
+    // Add/update deployments
+    for (const raw of rawList) {
+      const id = raw.uid || raw.id;
+      if (!deployStore.has(id)) {
+        const dep = makeDeploymentState(raw);
+        deployStore.set(id, dep);
+
+        // Announce new active deployments
+        if (!isTerminalDeployStatus(dep.status)) {
+          const env = dep.target === 'production' ? 'Main' : `PR #${dep.pullRequest || dep.branch}`;
+          const title = dep.changeTitle ? ` ${dep.changeTitle.split('\n')[0].slice(0, 80)}` : '';
+          const a = deployAlert('info', `Starting ${env}${title}`);
+          if (a) broadcastDeployAlert(a);
+        }
+      } else {
+        // Update mutable fields from list API
+        const dep = deployStore.get(id);
+        const newStatus = (raw.state || raw.readyState || dep.status).toUpperCase();
+        if (newStatus !== dep.status) {
+          dep.status = newStatus;
+          dep._lastStatus = newStatus;
+          if (isTerminalDeployStatus(newStatus) && !dep._terminalAnnounced) {
+            dep._terminalAnnounced = true;
+            if (newStatus === 'READY') dep.readyAtMs = raw.ready || Date.now();
+            announceDeploymentTerminal(dep);
+          }
+        }
+        if (raw.ready) dep.readyAtMs = raw.ready;
+        if (raw.errorMessage) dep.errorMessage = raw.errorMessage;
+      }
+
+      // Start event stream for active (non-terminal) deployments
+      if (!isTerminalDeployStatus(deployStore.get(id).status)) {
+        startDeploymentStream(id);
+      }
+    }
+
+    broadcastDeployments();
+  } catch (e) {
+    log(`[deploy] Refresh failed: ${e.message}`);
+  } finally {
+    deployRefreshing = false;
+  }
+}
+
+function broadcastDeployments() {
+  const deployments = [...deployStore.values()].map(serializeDeployment);
+  broadcast('deployments', { deployments });
+}
+
+function broadcastDeployAlert(alert) {
+  broadcast('deploy-alert', alert);
+}
+
+// ---------------------------------------------------------------------------
 // Refresh Logic
 // ---------------------------------------------------------------------------
 
@@ -613,7 +958,14 @@ function addSseClient(res) {
 
   // Send init
   const prs = [...prStore.values()].map(serializePr);
-  sendSse(res, 'init', { prs, alerts: alertLog, config: { repo: config.repo, noVoice: config.noVoice }, startedAt });
+  const deployments = [...deployStore.values()].map(serializeDeployment);
+  sendSse(res, 'init', {
+    prs, alerts: alertLog,
+    deployments, deployAlerts: deployAlertLog,
+    config: { repo: config.repo, noVoice: config.noVoice },
+    vercelConfig: { projectName: config.vercelProjectName, enabled: !!(config.vercelToken && config.vercelProjectId) },
+    startedAt,
+  });
 
   sseClients.add(res);
   res.on('close', () => sseClients.delete(res));
@@ -806,8 +1158,14 @@ function requestHandler(req, res) {
 
   if (req.method === 'GET' && url === '/api/state') {
     const prs = [...prStore.values()].map(serializePr);
+    const deployments = [...deployStore.values()].map(serializeDeployment);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ prs, alerts: alertLog, config: { repo: config.repo, noVoice: config.noVoice } }));
+    res.end(JSON.stringify({
+      prs, alerts: alertLog,
+      deployments, deployAlerts: deployAlertLog,
+      config: { repo: config.repo, noVoice: config.noVoice },
+      vercelConfig: { projectName: config.vercelProjectName, enabled: !!(config.vercelToken && config.vercelProjectId) },
+    }));
     return;
   }
 
@@ -896,6 +1254,47 @@ async function main() {
 
   await checkPrereqs();
 
+  // Vercel config resolution
+  if (config.vercelRepo) {
+    try {
+      const projectJsonPath = path.join(config.vercelRepo, '.vercel', 'project.json');
+      const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, 'utf8'));
+      if (!config.vercelProjectId && projectJson.projectId) config.vercelProjectId = projectJson.projectId;
+      if (!config.vercelTeamId && projectJson.orgId) config.vercelTeamId = projectJson.orgId;
+      if (!config.vercelProjectName && projectJson.projectName) config.vercelProjectName = projectJson.projectName;
+      log(`Vercel project from ${projectJsonPath}: ${config.vercelProjectName || config.vercelProjectId}`);
+    } catch (e) {
+      log(`Warning: Could not read .vercel/project.json from ${config.vercelRepo}: ${e.message}`);
+    }
+  }
+
+  if (!config.vercelToken) {
+    // Try macOS Keychain
+    try {
+      const token = await new Promise((resolve, reject) => {
+        execFile('security', ['find-generic-password', '-a', process.env.USER, '-s', 'vercel-token', '-w'], { timeout: 5000 }, (err, stdout) => {
+          if (err) return reject(err);
+          resolve(stdout.trim());
+        });
+      });
+      if (token) {
+        config.vercelToken = token;
+        log('Vercel token loaded from macOS Keychain');
+      }
+    } catch {
+      // Keychain lookup failed — silent
+    }
+  }
+
+  if (!config.vercelToken || !config.vercelProjectId) {
+    if (config.vercelRepo || config.vercelToken || config.vercelProjectId) {
+      log('Warning: Vercel deployment monitoring requires both token and project ID. Skipping.');
+    }
+    // If nothing vercel-related was specified, skip silently
+  } else {
+    log(`Vercel deployment monitoring enabled for ${config.vercelProjectName || config.vercelProjectId}`);
+  }
+
   const server = http.createServer(requestHandler);
   server.listen(config.port, () => {
     log(`PR Monitor for ${config.repo}`);
@@ -920,6 +1319,15 @@ async function main() {
   // Webhook forwarder
   startWebhookForwarder();
 
+  // Vercel deployment polling
+  let deployPollTimer = null;
+  if (config.vercelToken && config.vercelProjectId) {
+    log('Fetching initial deployment state...');
+    await refreshDeployments();
+    log(`Tracking ${deployStore.size} deployments`);
+    deployPollTimer = setInterval(() => refreshDeployments(), config.deployInterval * 1000);
+  }
+
   // Graceful shutdown
   function shutdown() {
     log('Shutting down...');
@@ -927,8 +1335,14 @@ async function main() {
       webhookProcess.kill('SIGTERM');
       setTimeout(() => { if (webhookProcess) webhookProcess.kill('SIGKILL'); }, 2000);
     }
+    // Kill all deployment event streams
+    for (const [id, req] of activeStreams) {
+      req.destroy();
+    }
+    activeStreams.clear();
     clearInterval(pollTimer);
     clearInterval(heartbeatTimer);
+    if (deployPollTimer) clearInterval(deployPollTimer);
     broadcast('shutdown', {});
     for (const client of sseClients) { client.end(); }
     server.close();

@@ -191,6 +191,46 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .btn-updating { background: var(--yellow-dim); color: var(--yellow); cursor: wait; }
 .btn-merging { background: var(--green-dim); color: var(--green); cursor: wait; }
 
+/* ─── Deployments ─── */
+#deploy-section {
+  border-top: 1px solid var(--border);
+  padding: 16px 24px 8px;
+  flex-shrink: 0;
+}
+#deploy-section.hidden { display: none; }
+.deploy-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  font-size: 12px; color: var(--text2);
+}
+.deploy-header .deploy-title { font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; font-size: 10px; color: var(--text3); }
+.deploy-list { display: flex; flex-direction: column; gap: 4px; }
+.deploy-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 80px 70px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.deploy-row:hover { background: var(--bg3); }
+.deploy-icon { text-align: center; }
+.deploy-title-cell {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.deploy-title-cell a { color: var(--text); text-decoration: none; font-size: 12px; font-weight: 500; }
+.deploy-title-cell a:hover { color: var(--blue); }
+.deploy-branch { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+.deploy-status { font-size: 11px; text-align: right; }
+.deploy-time { font-size: 11px; color: var(--text3); text-align: right; font-family: var(--mono); }
+.dep-ready { color: var(--green); }
+.dep-building { color: var(--yellow); }
+.dep-queued { color: var(--blue); }
+.dep-error { color: var(--red); }
+.dep-canceled { color: var(--text3); }
+
 /* ─── Alert Panel ─── */
 #alert-panel {
   flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg2);
@@ -249,6 +289,10 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
     </button>
     <select class="voice-select" id="voice-select" onchange="selectVoice(this.value)" title="Select voice"></select>
   </span>
+  <span class="voice-group" id="deploy-voice-group" style="display:none">
+    <span style="font-size:11px;color:var(--text3);margin:0 4px">Deploy:</span>
+    <select class="voice-select" id="deploy-voice-select" onchange="selectDeployVoice(this.value)" title="Deploy voice"></select>
+  </span>
   <button class="header-btn" onclick="doRefresh()" title="Refresh now">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
   </button>
@@ -267,6 +311,14 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   </div>
 </main>
 
+<div id="deploy-section" class="hidden">
+  <div class="deploy-header">
+    <span class="deploy-title">Deployments</span>
+    <span id="deploy-project-name"></span>
+  </div>
+  <div class="deploy-list" id="deploy-list"></div>
+</div>
+
 <div id="alert-panel"></div>
 
 <script>
@@ -282,6 +334,8 @@ const IC = {
 let prs = [], prevPrMap = new Map(), serverConfig = {};
 let voiceUnlocked = false, voiceQueue = [], speaking = false, selectedVoice = null;
 let startedAt = 0, evtSource = null;
+let deployments = [];
+let selectedDeployVoice = null;
 
 // ── SSE ──
 function connectSSE() {
@@ -294,6 +348,11 @@ function connectSSE() {
     prs = d.prs || [];
     renderPrs(prs, true);
     (d.alerts || []).forEach(a => appendAlert(a, false));
+    if (d.deployments) { deployments = d.deployments; renderDeployments(deployments); }
+    (d.deployAlerts || []).forEach(a => appendDeployAlert(a, false));
+    if (d.vercelConfig) {
+      document.getElementById('deploy-voice-group').style.display = '';
+    }
     setConn('live');
     document.getElementById('repo-name').textContent = serverConfig.repo || 'PR Monitor';
     document.getElementById('repo-link').href = `https://github.com/${serverConfig.repo}/pulls`;
@@ -305,6 +364,11 @@ function connectSSE() {
     document.getElementById('pr-count').textContent = prs.length;
   });
   evtSource.addEventListener('alert', (e) => appendAlert(JSON.parse(e.data), true));
+  evtSource.addEventListener('deployments', (e) => {
+    deployments = JSON.parse(e.data).deployments || [];
+    renderDeployments(deployments);
+  });
+  evtSource.addEventListener('deploy-alert', (e) => appendDeployAlert(JSON.parse(e.data), true));
   evtSource.addEventListener('heartbeat', () => {});
   evtSource.addEventListener('webhook', () => flashWh());
   evtSource.addEventListener('shutdown', () => setConn('disconnected'));
@@ -510,7 +574,7 @@ function loadVoices() {
     }
   };
   populate();
-  speechSynthesis.onvoiceschanged = populate;
+  speechSynthesis.addEventListener('voiceschanged', populate);
 }
 
 function isPremium(v) {
@@ -544,14 +608,17 @@ function toggleVoice() {
 
 function speakAlert(msg) {
   if (!voiceUnlocked || serverConfig.noVoice || !window.speechSynthesis) return;
-  voiceQueue.push(msg);
+  voiceQueue.push({ text: msg, voice: selectedVoice });
   drainVoice();
 }
 function drainVoice() {
   if (speaking || !voiceQueue.length) return;
   speaking = true;
-  const u = new SpeechSynthesisUtterance(voiceQueue.shift());
-  if (selectedVoice) u.voice = selectedVoice;
+  const item = voiceQueue.shift();
+  const text = typeof item === 'string' ? item : item.text;
+  const voice = typeof item === 'string' ? selectedVoice : (item.voice || selectedVoice);
+  const u = new SpeechSynthesisUtterance(text);
+  if (voice) u.voice = voice;
   u.rate = 1.0;
   u.onend = u.onerror = () => { speaking = false; drainVoice(); };
   speechSynthesis.speak(u);
@@ -576,8 +643,128 @@ function flashWh() {
   whTimer = setTimeout(() => el.classList.remove('on'), 400);
 }
 
+// ── Deployments ──
+function deployDuration(dep) {
+  const start = dep.createdAtMs ? dep.createdAtMs / 1000 : 0;
+  if (!start) return '';
+  const end = dep.readyAtMs ? dep.readyAtMs / 1000 : Date.now() / 1000;
+  const secs = Math.max(0, Math.floor(end - start));
+  if (secs < 60) return secs + 's';
+  return Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+}
+
+function deployAge(dep) {
+  if (!dep.createdAtMs) return '';
+  const secs = Math.floor((Date.now() - dep.createdAtMs) / 1000);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+  return Math.floor(secs / 3600) + 'h ago';
+}
+
+function renderDeployments(list) {
+  const section = document.getElementById('deploy-section');
+  const el = document.getElementById('deploy-list');
+  if (!list || list.length === 0) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  el.innerHTML = '';
+  for (const dep of list) {
+    const row = document.createElement('div');
+    row.className = 'deploy-row';
+    const state = (dep.state || dep.readyState || '').toUpperCase();
+    let icon, iconClass;
+    if (state === 'READY') { icon = '\u2713'; iconClass = 'dep-ready'; }
+    else if (['BUILDING', 'QUEUED', 'INITIALIZING'].includes(state)) { icon = '\u25D1'; iconClass = 'dep-building'; }
+    else if (['ERROR', 'FAILED'].includes(state)) { icon = '\u2716'; iconClass = 'dep-error'; }
+    else if (state === 'CANCELED') { icon = '\u25A0'; iconClass = 'dep-canceled'; }
+    else { icon = '\u25CB'; iconClass = 'dep-building'; }
+    const title = dep.changeTitle || dep.branch || dep.name || '';
+    const branch = dep.branch || '';
+    const url = dep.url || dep.inspectorUrl || '#';
+    const isActive = ['BUILDING', 'QUEUED', 'INITIALIZING'].includes(state);
+    const statusText = isActive
+      ? (dep.stepName ? dep.stepName : state.toLowerCase()) + ' ' + deployDuration(dep)
+      : state.toLowerCase();
+    const timeText = dep.readyAtMs ? deployDuration(dep) + ' \u00B7 ' + deployAge(dep) : (isActive ? deployDuration(dep) : deployAge(dep));
+    row.innerHTML = `
+      <div class="deploy-icon ${iconClass}">${icon}</div>
+      <div class="deploy-title-cell">
+        <a href="${esc(url)}" target="_blank" title="${esc(title)}">${esc(title)}</a>
+        <div class="deploy-branch">${esc(branch)}</div>
+      </div>
+      <div class="deploy-status ${iconClass}">${esc(statusText)}</div>
+      <div class="deploy-time">${esc(timeText)}</div>
+    `;
+    el.appendChild(row);
+  }
+}
+
+function appendDeployAlert(a, live) {
+  const panel = document.getElementById('alert-panel');
+  const entry = document.createElement('div');
+  entry.className = 'alert-entry';
+  const ts = new Date(a.ts).toLocaleTimeString('en-US', { hour12: false });
+  entry.innerHTML = `<span class="alert-ts">${ts}</span><span class="alert-dot ${a.level}"></span><span class="alert-msg">${esc(a.message)}</span>`;
+  panel.appendChild(entry);
+  while (panel.children.length > 50) panel.removeChild(panel.firstChild);
+  panel.scrollTop = panel.scrollHeight;
+  if (live) { speakDeployAlert(a.message); showNotif(a); }
+}
+
+function speakDeployAlert(msg) {
+  if (!voiceUnlocked || serverConfig.noVoice || !window.speechSynthesis) return;
+  voiceQueue.push({ text: msg, voice: selectedDeployVoice });
+  drainVoice();
+}
+
+// ── Deploy Voice ──
+function loadDeployVoices() {
+  if (!window.speechSynthesis) return;
+  const populate = () => {
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length) return;
+    const sorted = [...voices].sort((a, b) => {
+      const ap = isPremium(a), bp = isPremium(b);
+      if (ap && !bp) return -1;
+      if (!ap && bp) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    const sel = document.getElementById('deploy-voice-select');
+    sel.innerHTML = '';
+    for (const v of sorted) {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      const tag = isPremium(v) ? ' \u2605' : '';
+      opt.textContent = `${v.name}${tag}`;
+      sel.appendChild(opt);
+    }
+    const saved = localStorage.getItem('pr-monitor-deploy-voice');
+    const match = saved && sorted.find(v => v.name === saved);
+    if (match) {
+      selectedDeployVoice = match;
+      sel.value = match.name;
+    } else if (!selectedDeployVoice) {
+      // Pick a different default than the PR voice
+      const prVoiceName = selectedVoice ? selectedVoice.name : '';
+      const best = sorted.find(v => isPremium(v) && v.lang.startsWith('en') && v.name !== prVoiceName)
+        || sorted.find(v => v.lang.startsWith('en') && v.name !== prVoiceName)
+        || sorted.find(v => v.name !== prVoiceName)
+        || sorted[0];
+      if (best) { selectedDeployVoice = best; sel.value = best.name; }
+    }
+  };
+  populate();
+  speechSynthesis.addEventListener('voiceschanged', populate);
+}
+
+function selectDeployVoice(name) {
+  const voices = speechSynthesis.getVoices();
+  selectedDeployVoice = voices.find(v => v.name === name) || null;
+  try { localStorage.setItem('pr-monitor-deploy-voice', name); } catch {}
+}
+
 // ── Init ──
 loadVoices();
+loadDeployVoices();
 connectSSE();
 
 // Restore voice enabled state — needs a user gesture to actually unlock speech.
