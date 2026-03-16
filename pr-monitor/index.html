@@ -359,7 +359,6 @@ function renderPrs(list, initial) {
           <span class="pr-branch" style="margin:0">${esc(pr.branch)}</span>
           <span class="size-${(pr.sizeLabel||'s').toLowerCase()}" title="${pr.additions}+ ${pr.deletions}- ${pr.changedFiles} files">${pr.sizeLabel || '?'}</span>
           ${severityIndicator(pr)}
-          ${!pr.humanReviewed && pr.reviewCount > 0 ? '<span class="no-human" title="No human reviewer">\u2639 bot-only</span>' : ''}
         </div>
       </div>
       <div>${statusCell(pr)}</div>
