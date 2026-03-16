@@ -443,8 +443,13 @@ function loadVoices() {
       opt.textContent = `${v.name}${tag}`;
       sel.appendChild(opt);
     }
-    // Auto-select best premium english voice
-    if (!selectedVoice) {
+    // Restore saved voice or auto-select best premium english voice
+    const saved = localStorage.getItem('pr-monitor-voice');
+    const match = saved && voiceList.find(v => v.name === saved);
+    if (match) {
+      selectedVoice = match;
+      sel.value = match.name;
+    } else if (!selectedVoice) {
       const best = voiceList.find(v => isPremium(v) && v.lang.startsWith('en')) || voiceList.find(v => v.lang.startsWith('en')) || voiceList[0];
       if (best) { selectedVoice = best; sel.value = best.name; }
     }
@@ -461,6 +466,7 @@ function isPremium(v) {
 
 function selectVoice(name) {
   selectedVoice = voiceList.find(v => v.name === name) || null;
+  try { localStorage.setItem('pr-monitor-voice', name); } catch {}
 }
 
 function toggleVoice() {
@@ -478,6 +484,7 @@ function toggleVoice() {
     speechSynthesis.speak(u);
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
   }
+  try { localStorage.setItem('pr-monitor-voice-enabled', voiceUnlocked ? '1' : '0'); } catch {}
 }
 
 function speakAlert(msg) {
@@ -517,6 +524,13 @@ function flashWh() {
 // ── Init ──
 loadVoices();
 connectSSE();
+
+// Restore voice enabled state (voice won't actually speak until user interacts,
+// but we set the flag + UI so the next alert will trigger it)
+if (localStorage.getItem('pr-monitor-voice-enabled') === '1' && window.speechSynthesis) {
+  voiceUnlocked = true;
+  document.getElementById('voice-btn').classList.add('active');
+}
 </script>
 </body>
 </html>
