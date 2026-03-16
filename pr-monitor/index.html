@@ -341,7 +341,7 @@ function renderPrs(list, initial) {
       <div>${statusBadge(pr)}</div>
       <div class="cell ${ciClass(pr.ciStatus)}">${IC.ci} ${pr.ciStatus}</div>
       <div class="cell ${mergeClass(pr.mergeable, pr.mergeStateStatus)}">${IC.merge} ${mergeText(pr.mergeable, pr.mergeStateStatus)}</div>
-      <div class="cell ${reviewClass(pr.reviewState)}">${IC.review} ${pr.reviewState}</div>
+      <div class="cell ${reviewClass(pr.reviewState)}">${IC.review} ${reviewText(pr.reviewState)}</div>
       <div class="cell ${threadClass}">${IC.comment} ${threadStr}</div>
       <div class="cell" style="color:var(--text2)" title="${esc(allRevs)}">${allRevs ? IC.people + ' ' + esc(allRevs) : '<span style="color:var(--text3)">&mdash;</span>'}</div>
       <div class="pr-title-cell">
@@ -375,7 +375,7 @@ function statusBadge(pr) {
   if (pr.mergeStateStatus === 'BEHIND') return '<span class="badge badge-behind">Behind</span>';
   if (pr.ciStatus === 'pending') return '<span class="badge badge-pending">Pending</span>';
   if (pr.reviewState === 'changes') return '<span class="badge badge-review">Changes</span>';
-  if (pr.reviewState === 'pending') return '<span class="badge badge-pending">In Review</span>';
+  if (pr.reviewState === 'pending') return '<span class="badge badge-pending">Reviewed</span>';
   if (pr.reviewState === 'none' && !pr.isDraft) return '<span class="badge badge-no-review">No Review</span>';
   return '<span class="badge badge-open">Open</span>';
 }
@@ -390,6 +390,7 @@ function mergeText(m, s) {
   return { CLEAN:'clean', BEHIND:'behind', BLOCKED:'blocked', DIRTY:'dirty', UNSTABLE:'unstable', UNKNOWN:'\u2014' }[s] || s;
 }
 function reviewClass(s) { return { approved:'review-approved', changes:'review-changes', pending:'review-pending', none:'review-none' }[s] || 'review-none'; }
+function reviewText(s) { return { approved:'approved', changes:'changes', pending:'reviewed', none:'none' }[s] || s; }
 function shortName(l) { return l.startsWith('copilot') ? 'copilot' : l.split(/[-_.]/)[0]; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
