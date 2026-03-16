@@ -147,6 +147,7 @@ function makePrState(raw) {
     _announced: { created: false, conflicts: false, ciFail: false, noReview: false, ready: false },
     _issueSinceEpoch: 0,
     _lastStillEpoch: 0,
+    _lastUpdateAttempt: 0,
   };
 }
 
@@ -294,11 +295,18 @@ function detectTransitions(pr) {
     alert('success', `${num} conflicts resolved`);
   }
 
-  // Behind / blocked — try auto-update when merge state indicates branch is not current
+  // Behind / blocked — auto-update branch
   const needsUpdate = ['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
-  const prevNeedsUpdate = prev && ['BEHIND', 'BLOCKED', 'DIRTY'].includes(prev.mergeStateStatus);
-  if (needsUpdate && config.autoUpdate && !prevNeedsUpdate) {
-    tryUpdateBranch(num);
+  if (needsUpdate && config.autoUpdate) {
+    const prevNeedsUpdate = prev && ['BEHIND', 'BLOCKED', 'DIRTY'].includes(prev.mergeStateStatus);
+    // Update on first detection, then retry every 60s
+    const lastUpdate = pr._lastUpdateAttempt || 0;
+    if (!prevNeedsUpdate || (Date.now() - lastUpdate) > 60_000) {
+      pr._lastUpdateAttempt = Date.now();
+      tryUpdateBranch(num);
+    }
+  } else {
+    pr._lastUpdateAttempt = 0;
   }
 
   // CI
@@ -353,9 +361,18 @@ function shortName(login) {
 }
 
 function tryUpdateBranch(number) {
+  log(`Updating branch for PR #${number}...`);
   gh(['pr', 'update-branch', String(number), '-R', config.repo]).then(
-    () => log(`PR #${number} branch updated`),
-    () => log(`PR #${number} branch update failed`)
+    () => {
+      log(`PR #${number} branch updated`);
+      const a = { ts: Date.now(), level: 'info', message: `PR ${number} branch updated`, prNumber: number };
+      alertLog.push(a); if (alertLog.length > MAX_ALERTS) alertLog.shift();
+      broadcastAlert(a);
+      setTimeout(() => refreshSinglePr(number), 3000);
+    },
+    (e) => {
+      log(`PR #${number} branch update failed: ${e.message}`);
+    }
   );
 }
 
