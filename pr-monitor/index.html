@@ -346,6 +346,7 @@ function renderPrs(list, initial) {
       <div class="cell" style="color:var(--text2)" title="${esc(allRevs)}">${allRevs ? IC.people + ' ' + esc(allRevs) : '<span style="color:var(--text3)">&mdash;</span>'}</div>
       <div class="pr-title-cell">
         <a href="${esc(pr.url)}" target="_blank" title="${esc(pr.title)}">${esc(pr.title)}</a>
+        <div class="pr-branch">${esc(pr.branch)}</div>
       </div>
       <div style="text-align:right">
         <button class="merge-btn" ${pr.isReady ? '' : 'disabled'} onclick="doMerge(${pr.number}, this)" title="${pr.isReady ? 'Squash and merge' : 'Not ready'}">
