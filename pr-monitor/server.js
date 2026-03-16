@@ -141,6 +141,12 @@ function makePrState(raw) {
     unresolvedThreads: 0,
     totalThreads: 0,
     requestedReviewers: [],
+    additions: 0,
+    deletions: 0,
+    changedFiles: 0,
+    sizeLabel: '',
+    humanReviewed: false,
+    commentSeverity: { critical: 0, suggestion: 0, note: 0 },
     isReady: false,
     isUpdating: false,
     updatedAt: Date.now(),
@@ -164,21 +170,43 @@ async function fetchPrList() {
 }
 
 async function fetchPrDetail(number) {
-  const fields = 'number,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,reviews,reviewRequests,isDraft';
+  const fields = 'number,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,reviews,reviewRequests,isDraft,additions,deletions,changedFiles';
   return ghJson(['pr', 'view', String(number), '-R', config.repo, '--json', fields]);
 }
 
-async function fetchThreadCounts(number) {
+async function fetchReviewInsights(number) {
   const [owner, name] = config.repo.split('/');
-  const query = `query($o:String!,$n:String!,$num:Int!){repository(owner:$o,name:$n){pullRequest(number:$num){reviewThreads(first:100){nodes{isResolved}}}}}`;
+  const query = `query($o:String!,$n:String!,$num:Int!){repository(owner:$o,name:$n){pullRequest(number:$num){reviewThreads(first:100){nodes{isResolved,comments(first:1){nodes{body,author{login}}}}}}}}`;
   try {
     const result = await ghJson(['api', 'graphql', '-f', `query=${query}`, '-F', `o=${owner}`, '-F', `n=${name}`, '-F', `num=${number}`]);
     const threads = result.data?.repository?.pullRequest?.reviewThreads?.nodes || [];
     const total = threads.length;
     const unresolved = threads.filter(t => !t.isResolved).length;
-    return { unresolved, total };
+
+    // Classify comment severity
+    const severity = { critical: 0, suggestion: 0, note: 0 };
+    const criticalRe = /\b(bug|security|vulnerability|crash|data.?loss|breaking|critical|must fix|error handling|race.?condition|injection|xss|overflow|undefined|null.?pointer|incorrect|wrong)\b/i;
+    const suggestionRe = /\b(nit|suggestion|consider|optional|minor|style|typo|rename|cosmetic|could|might|prefer|cleanup|formatting|naming)\b/i;
+
+    for (const t of threads) {
+      const body = t.comments?.nodes?.[0]?.body || '';
+      if (criticalRe.test(body)) severity.critical++;
+      else if (suggestionRe.test(body)) severity.suggestion++;
+      else if (body.length > 0) severity.note++;
+    }
+
+    // Detect if any human (non-bot) reviewed
+    const humanAuthors = new Set();
+    for (const t of threads) {
+      const login = t.comments?.nodes?.[0]?.author?.login || '';
+      if (login && !login.includes('bot') && !login.includes('copilot') && !login.startsWith('github-actions')) {
+        humanAuthors.add(login);
+      }
+    }
+
+    return { unresolved, total, severity, humanReviewed: humanAuthors.size > 0 };
   } catch {
-    return { unresolved: 0, total: 0 };
+    return { unresolved: 0, total: 0, severity: { critical: 0, suggestion: 0, note: 0 }, humanReviewed: false };
   }
 }
 
@@ -186,6 +214,13 @@ function derivePrState(pr, detail) {
   pr.mergeable = detail.mergeable || 'UNKNOWN';
   pr.mergeStateStatus = detail.mergeStateStatus || 'UNKNOWN';
   pr.isDraft = !!detail.isDraft;
+
+  // Size
+  pr.additions = detail.additions || 0;
+  pr.deletions = detail.deletions || 0;
+  pr.changedFiles = detail.changedFiles || 0;
+  const lines = pr.additions + pr.deletions;
+  pr.sizeLabel = lines <= 30 ? 'XS' : lines <= 100 ? 'S' : lines <= 300 ? 'M' : lines <= 800 ? 'L' : 'XL';
 
   // CI status
   const checks = detail.statusCheckRollup || [];
@@ -480,12 +515,14 @@ async function refreshAllPrs() {
     for (const [num, pr] of prStore) {
       try {
         pr._prev = snapshot(pr);
-        const [detail, threads] = await Promise.all([
+        const [detail, insights] = await Promise.all([
           fetchPrDetail(num),
-          fetchThreadCounts(num),
+          fetchReviewInsights(num),
         ]);
-        pr.unresolvedThreads = threads.unresolved;
-        pr.totalThreads = threads.total;
+        pr.unresolvedThreads = insights.unresolved;
+        pr.totalThreads = insights.total;
+        pr.commentSeverity = insights.severity;
+        pr.humanReviewed = insights.humanReviewed;
         derivePrState(pr, detail);
         const alerts = detectTransitions(pr);
         allAlerts.push(...alerts);
@@ -517,12 +554,14 @@ async function refreshSinglePr(number) {
     const pr = prStore.get(number);
     pr._prev = snapshot(pr);
 
-    const [detail, threads] = await Promise.all([
+    const [detail, insights] = await Promise.all([
       fetchPrDetail(number),
-      fetchThreadCounts(number),
+      fetchReviewInsights(number),
     ]);
-    pr.unresolvedThreads = threads.unresolved;
-    pr.totalThreads = threads.total;
+    pr.unresolvedThreads = insights.unresolved;
+    pr.totalThreads = insights.total;
+    pr.commentSeverity = insights.severity;
+    pr.humanReviewed = insights.humanReviewed;
     derivePrState(pr, detail);
 
     const alerts = detectTransitions(pr);
@@ -608,6 +647,12 @@ function serializePr(pr) {
     unresolvedThreads: pr.unresolvedThreads,
     totalThreads: pr.totalThreads,
     requestedReviewers: pr.requestedReviewers,
+    additions: pr.additions,
+    deletions: pr.deletions,
+    changedFiles: pr.changedFiles,
+    sizeLabel: pr.sizeLabel,
+    humanReviewed: pr.humanReviewed,
+    commentSeverity: pr.commentSeverity,
     isReady: pr.isReady,
     isUpdating: pr.isUpdating,
     updatedAt: pr.updatedAt,

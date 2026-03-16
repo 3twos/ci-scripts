@@ -165,6 +165,18 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .pr-title-cell a:hover { color: var(--blue); }
 .pr-branch { font-size: 11px; color: var(--text3); margin-top: 2px; font-family: var(--mono);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-indicators {
+  display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 10px; color: var(--text3);
+}
+.size-xs { color: var(--text3); }
+.size-s { color: var(--green); }
+.size-m { color: var(--blue); }
+.size-l { color: var(--yellow); }
+.size-xl { color: var(--red); font-weight: 600; }
+.sev-critical { color: var(--red); font-weight: 600; }
+.sev-suggestion { color: var(--yellow); }
+.sev-note { color: var(--text2); }
+.no-human { color: var(--yellow); font-weight: 500; }
 
 /* Action buttons in status column */
 .action-btn {
@@ -343,7 +355,12 @@ function renderPrs(list, initial) {
       <div class="pr-num"><a href="${esc(pr.url)}" target="_blank">#${pr.number}</a></div>
       <div class="pr-title-cell">
         <a href="${esc(pr.url)}" target="_blank" title="${esc(pr.title)}">${esc(pr.title)}</a>
-        <div class="pr-branch">${esc(pr.branch)}</div>
+        <div class="pr-indicators">
+          <span class="pr-branch" style="margin:0">${esc(pr.branch)}</span>
+          <span class="size-${(pr.sizeLabel||'s').toLowerCase()}" title="${pr.additions}+ ${pr.deletions}- ${pr.changedFiles} files">${pr.sizeLabel || '?'}</span>
+          ${severityIndicator(pr)}
+          ${!pr.humanReviewed && pr.reviewCount > 0 ? '<span class="no-human" title="No human reviewer">\u2639 bot-only</span>' : ''}
+        </div>
       </div>
       <div>${statusCell(pr)}</div>
       <div class="cell ${ciClass(pr.ciStatus)}" title="CI: ${pr.ciStatus}">${ciIcon(pr.ciStatus)}</div>
@@ -406,6 +423,14 @@ function mergeClass(m, s) {
 function mergeText(m, s) {
   if (m === 'CONFLICTING') return 'conflict';
   return { CLEAN:'clean', BEHIND:'behind', BLOCKED:'blocked', DIRTY:'dirty', UNSTABLE:'unstable', UNKNOWN:'\u2014' }[s] || s;
+}
+function severityIndicator(pr) {
+  const s = pr.commentSeverity || {};
+  const parts = [];
+  if (s.critical > 0) parts.push(`<span class="sev-critical" title="${s.critical} critical">\u26A0 ${s.critical} critical</span>`);
+  if (s.suggestion > 0) parts.push(`<span class="sev-suggestion" title="${s.suggestion} suggestions">${s.suggestion} suggestion${s.suggestion>1?'s':''}</span>`);
+  if (s.note > 0) parts.push(`<span class="sev-note">${s.note} note${s.note>1?'s':''}</span>`);
+  return parts.join(' ');
 }
 function shortName(l) { return l.startsWith('copilot') ? 'copilot' : l.split(/[-_.]/)[0]; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
