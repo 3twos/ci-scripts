@@ -271,7 +271,11 @@ function detectTransitions(pr) {
   const num = pr.number;
 
   function alert(level, message) {
-    const a = { ts: Date.now(), level, message: `PR ${message}`, prNumber: num };
+    const fullMsg = `PR ${message}`;
+    // Deduplicate: skip if same PR + same message within 10s
+    const recent = alertLog.filter(a => a.prNumber === num && a.message === fullMsg && (Date.now() - a.ts) < 10_000);
+    if (recent.length > 0) return;
+    const a = { ts: Date.now(), level, message: fullMsg, prNumber: num };
     alerts.push(a);
     alertLog.push(a);
     if (alertLog.length > MAX_ALERTS) alertLog.shift();
