@@ -142,6 +142,7 @@ function makePrState(raw) {
     totalThreads: 0,
     requestedReviewers: [],
     isReady: false,
+    isUpdating: false,
     updatedAt: Date.now(),
     _prev: null,
     _announced: { created: false, conflicts: false, ciFail: false, noReview: false, ready: false },
@@ -374,8 +375,10 @@ function dequeueUpdate(number) {
   const idx = updateQueue.indexOf(number);
   if (idx >= 0) updateQueue.splice(idx, 1);
   if (updateInFlight === number) {
-    // PR is now clean — move to next
+    const pr = prStore.get(number);
+    if (pr) pr.isUpdating = false;
     updateInFlight = null;
+    broadcastState();
     processUpdateQueue();
   }
 }
@@ -386,14 +389,16 @@ function processUpdateQueue() {
 
   const number = updateQueue.shift();
 
-  // Verify it still needs update
   const pr = prStore.get(number);
   if (!pr || pr.mergeStateStatus === 'CLEAN') {
+    if (pr) pr.isUpdating = false;
     processUpdateQueue();
     return;
   }
 
   updateInFlight = number;
+  pr.isUpdating = true;
+  broadcastState();
   log(`Updating branch for PR #${number} (${updateQueue.length} queued)...`);
 
   gh(['pr', 'update-branch', String(number), '-R', config.repo]).then(
@@ -402,12 +407,13 @@ function processUpdateQueue() {
       const a = { ts: Date.now(), level: 'info', message: `PR ${number} branch updated`, prNumber: number };
       alertLog.push(a); if (alertLog.length > MAX_ALERTS) alertLog.shift();
       broadcastAlert(a);
-      // Poll this PR until it becomes CLEAN, then move on
       scheduleUpdateCheck(number);
     },
     (e) => {
       log(`PR #${number} branch update failed: ${e.message}`);
+      if (pr) pr.isUpdating = false;
       updateInFlight = null;
+      broadcastState();
       processUpdateQueue();
     }
   );
@@ -537,6 +543,7 @@ function snapshot(pr) {
     reviewState: pr.reviewState,
     reviewCount: pr.reviewCount,
     isReady: pr.isReady,
+    isUpdating: pr.isUpdating,
   };
 }
 
@@ -601,6 +608,7 @@ function serializePr(pr) {
     totalThreads: pr.totalThreads,
     requestedReviewers: pr.requestedReviewers,
     isReady: pr.isReady,
+    isUpdating: pr.isUpdating,
     updatedAt: pr.updatedAt,
   };
 }
@@ -754,6 +762,16 @@ function requestHandler(req, res) {
   if (mergeMatch) {
     const prNumber = mergeMatch[1];
     handleMerge(prNumber, res);
+    return;
+  }
+
+  // POST /api/update/:number — update branch
+  const updateMatch = req.method === 'POST' && url.match(/^\/api\/update\/(\d+)$/);
+  if (updateMatch) {
+    const prNumber = Number(updateMatch[1]);
+    enqueueUpdate(prNumber);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, queued: true }));
     return;
   }
 

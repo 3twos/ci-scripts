@@ -97,7 +97,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 /* ─── Column headers ─── */
 .col-headers {
   display: grid;
-  grid-template-columns: 56px 1fr 100px 32px 80px 60px 120px 90px;
+  grid-template-columns: 56px 1fr 120px 32px 80px 60px 120px;
   gap: 8px;
   padding: 0 18px 6px;
   font-size: 10px;
@@ -112,7 +112,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .pr-list { display: flex; flex-direction: column; gap: 6px; }
 .pr-card {
   display: grid;
-  grid-template-columns: 56px 1fr 100px 32px 80px 60px 120px 90px;
+  grid-template-columns: 56px 1fr 120px 32px 80px 60px 120px;
   align-items: center;
   gap: 8px;
   padding: 12px 18px;
@@ -166,15 +166,20 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .pr-branch { font-size: 11px; color: var(--text3); margin-top: 2px; font-family: var(--mono);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.merge-btn {
+/* Action buttons in status column */
+.action-btn {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 5px 12px; border-radius: var(--radius); border: none;
-  font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s;
-  background: var(--green); color: #fff; white-space: nowrap;
+  padding: 4px 12px; border-radius: 20px; border: none;
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
 }
-.merge-btn:hover { background: #2ea043; box-shadow: 0 0 8px rgba(63,185,80,0.3); }
-.merge-btn:disabled { opacity: 0.15; cursor: not-allowed; background: var(--text3); }
-.merge-btn.merging { background: var(--yellow); }
+.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-merge { background: var(--green); color: #fff; }
+.btn-merge:hover { background: #2ea043; box-shadow: 0 0 8px rgba(63,185,80,0.3); }
+.btn-update { background: var(--yellow); color: #000; }
+.btn-update:hover { background: #c08a1e; }
+.btn-updating { background: var(--yellow-dim); color: var(--yellow); cursor: wait; }
+.btn-merging { background: var(--green-dim); color: var(--green); cursor: wait; }
 
 /* ─── Alert Panel ─── */
 #alert-panel {
@@ -245,7 +250,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   </div>
   <div id="pr-container" style="display:none">
     <div class="col-headers" id="col-headers">
-      <span>#</span><span>title</span><span>status</span><span>ci</span><span>merge</span><span>threads</span><span>reviewers</span><span></span>
+      <span>#</span><span>title</span><span>status</span><span>ci</span><span>merge</span><span>threads</span><span>reviewers</span>
     </div>
     <div class="pr-list" id="pr-list"></div>
   </div>
@@ -339,16 +344,11 @@ function renderPrs(list, initial) {
         <a href="${esc(pr.url)}" target="_blank" title="${esc(pr.title)}">${esc(pr.title)}</a>
         <div class="pr-branch">${esc(pr.branch)}</div>
       </div>
-      <div>${statusBadge(pr)}</div>
+      <div>${statusCell(pr)}</div>
       <div class="cell ${ciClass(pr.ciStatus)}" title="CI: ${pr.ciStatus}">${ciIcon(pr.ciStatus)}</div>
       <div class="cell ${mergeClass(pr.mergeable, pr.mergeStateStatus)}">${IC.merge} ${mergeText(pr.mergeable, pr.mergeStateStatus)}</div>
       <div class="cell ${threadClass}">${IC.comment} ${threadStr}</div>
       <div class="cell" style="color:var(--text2)" title="${esc(allRevs)}">${allRevs ? IC.people + ' ' + esc(allRevs) : '<span style="color:var(--text3)">&mdash;</span>'}</div>
-      <div style="text-align:right">
-        <button class="merge-btn" ${pr.isReady ? '' : 'disabled'} onclick="doMerge(${pr.number}, this)" title="${pr.isReady ? 'Squash and merge' : 'Not ready'}">
-          ${IC.squash} Merge
-        </button>
-      </div>
     `;
     frag.appendChild(card);
   }
@@ -361,15 +361,21 @@ function hasChanged(pr) {
   if (!p) return true;
   return p.ciStatus !== pr.ciStatus || p.mergeable !== pr.mergeable || p.mergeStateStatus !== pr.mergeStateStatus
     || p.reviewState !== pr.reviewState || p.reviewCount !== pr.reviewCount
-    || p.unresolvedThreads !== pr.unresolvedThreads || p.isReady !== pr.isReady || p.totalThreads !== pr.totalThreads;
+    || p.unresolvedThreads !== pr.unresolvedThreads || p.isReady !== pr.isReady || p.totalThreads !== pr.totalThreads
+    || p.isUpdating !== pr.isUpdating;
 }
 
-function statusBadge(pr) {
+function statusCell(pr) {
+  // Actionable states — buttons
+  if (pr.isReady) return `<button class="action-btn btn-merge" onclick="doMerge(${pr.number}, this)">${IC.squash} Merge</button>`;
+  if (pr.isUpdating) return '<span class="action-btn btn-updating">\u25D1 Updating</span>';
+  const isBehind = ['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
+  if (isBehind) return `<button class="action-btn btn-update" onclick="doUpdate(${pr.number}, this)">\u2191 Update</button>`;
+
+  // Non-actionable states — badges
   if (pr.isDraft) return '<span class="badge badge-draft">Draft</span>';
-  if (pr.isReady) return '<span class="badge badge-ready">Ready</span>';
   if (pr.mergeable === 'CONFLICTING') return '<span class="badge badge-conflict">Conflict</span>';
   if (pr.ciStatus === 'failing') return '<span class="badge badge-ci-fail">CI Fail</span>';
-  if (pr.mergeStateStatus === 'BEHIND') return '<span class="badge badge-behind">Behind</span>';
   if (pr.ciStatus === 'pending') return '<span class="badge badge-pending">Pending</span>';
   if (pr.reviewState === 'changes') return '<span class="badge badge-review">Changes</span>';
   if (pr.reviewState === 'pending') return '<span class="badge badge-pending">Reviewed</span>';
@@ -392,16 +398,24 @@ function mergeText(m, s) {
 function shortName(l) { return l.startsWith('copilot') ? 'copilot' : l.split(/[-_.]/)[0]; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
-// ── Merge ──
+// ── Actions ──
 async function doMerge(num, btn) {
   btn.disabled = true;
-  btn.classList.add('merging');
+  btn.className = 'action-btn btn-merging';
   btn.innerHTML = IC.squash + ' Merging\u2026';
   try {
     const r = await fetch(`/api/merge/${num}`, { method: 'POST' });
     const data = await r.json();
     btn.innerHTML = data.ok ? (IC.squash + ' Merged!') : (IC.squash + ' Failed');
   } catch { btn.innerHTML = IC.squash + ' Error'; }
+}
+async function doUpdate(num, btn) {
+  btn.disabled = true;
+  btn.className = 'action-btn btn-updating';
+  btn.innerHTML = '\u25D1 Updating';
+  try {
+    await fetch(`/api/update/${num}`, { method: 'POST' });
+  } catch {}
 }
 function doRefresh() { fetch('/api/refresh', { method: 'POST' }); }
 
