@@ -231,7 +231,7 @@ function detectTransitions(pr) {
   const num = pr.number;
 
   function alert(level, message) {
-    const a = { ts: Date.now(), level, message, prNumber: num };
+    const a = { ts: Date.now(), level, message: `PR ${message}`, prNumber: num };
     alerts.push(a);
     alertLog.push(a);
     if (alertLog.length > MAX_ALERTS) alertLog.shift();
@@ -328,7 +328,7 @@ function detectTransitions(pr) {
     if (pr._issueSinceEpoch === 0) { pr._issueSinceEpoch = Date.now(); pr._announcedStill = false; }
     if (!pr._announcedStill && (Date.now() - pr._issueSinceEpoch) >= STILL_THRESHOLD_MS) {
       pr._announcedStill = true;
-      alert('warning', `Still ${num} ${issueDesc}`);
+      alert('warning', `${num} still ${issueDesc}`);
     }
   } else {
     pr._issueSinceEpoch = 0;
