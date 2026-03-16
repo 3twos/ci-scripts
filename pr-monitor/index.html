@@ -206,25 +206,25 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .deploy-list { display: flex; flex-direction: column; gap: 4px; }
 .deploy-row {
   display: grid;
-  grid-template-columns: 24px 1fr 80px 70px;
-  gap: 8px;
+  grid-template-columns: 28px 1fr 100px 80px;
+  gap: 10px;
   align-items: center;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
   border-radius: var(--radius);
   background: var(--bg);
 }
 .deploy-row:hover { background: var(--bg3); }
-.deploy-icon { text-align: center; }
+.deploy-icon { text-align: center; font-size: 15px; }
 .deploy-title-cell {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   min-width: 0;
 }
-.deploy-title-cell a { color: var(--text); text-decoration: none; font-size: 12px; font-weight: 500; }
+.deploy-title-cell a { color: var(--text); text-decoration: none; font-size: 13px; font-weight: 500; }
 .deploy-title-cell a:hover { color: var(--blue); }
-.deploy-branch { font-size: 10px; color: var(--text3); font-family: var(--mono); }
-.deploy-status { font-size: 11px; text-align: right; }
-.deploy-time { font-size: 11px; color: var(--text3); text-align: right; font-family: var(--mono); }
+.deploy-branch { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+.deploy-status { font-size: 12px; text-align: right; }
+.deploy-time { font-size: 12px; color: var(--text3); text-align: right; font-family: var(--mono); }
 .dep-ready { color: var(--green); }
 .dep-building { color: var(--yellow); }
 .dep-queued { color: var(--blue); }
@@ -667,24 +667,26 @@ function renderDeployments(list) {
   if (!list || list.length === 0) { section.classList.add('hidden'); return; }
   section.classList.remove('hidden');
   el.innerHTML = '';
-  for (const dep of list) {
+  for (const dep of list.slice(0, 5)) {
     const row = document.createElement('div');
     row.className = 'deploy-row';
-    const state = (dep.state || dep.readyState || '').toUpperCase();
+    const state = (dep.status || '').toUpperCase();
     let icon, iconClass;
-    if (state === 'READY') { icon = '\u2713'; iconClass = 'dep-ready'; }
+    if (state === 'READY') { icon = '\u2714'; iconClass = 'dep-ready'; }
     else if (['BUILDING', 'QUEUED', 'INITIALIZING'].includes(state)) { icon = '\u25D1'; iconClass = 'dep-building'; }
-    else if (['ERROR', 'FAILED'].includes(state)) { icon = '\u2716'; iconClass = 'dep-error'; }
+    else if (['ERROR', 'FAILED'].includes(state)) { icon = '\u2718'; iconClass = 'dep-error'; }
     else if (state === 'CANCELED') { icon = '\u25A0'; iconClass = 'dep-canceled'; }
-    else { icon = '\u25CB'; iconClass = 'dep-building'; }
-    const title = dep.changeTitle || dep.branch || dep.name || '';
+    else { icon = '\u25D1'; iconClass = 'dep-building'; }
+    const title = dep.changeTitle || dep.branch || '';
     const branch = dep.branch || '';
-    const url = dep.url || dep.inspectorUrl || '#';
+    const url = dep.url || '#';
     const isActive = ['BUILDING', 'QUEUED', 'INITIALIZING'].includes(state);
     const statusText = isActive
-      ? (dep.stepName ? dep.stepName : state.toLowerCase()) + ' ' + deployDuration(dep)
-      : state.toLowerCase();
-    const timeText = dep.readyAtMs ? deployDuration(dep) + ' \u00B7 ' + deployAge(dep) : (isActive ? deployDuration(dep) : deployAge(dep));
+      ? (dep.step || state.toLowerCase()) + ' ' + deployDuration(dep)
+      : '';
+    const timeText = dep.readyAtMs
+      ? deployDuration(dep) + ' \u00B7 ' + deployAge(dep)
+      : (isActive ? deployDuration(dep) : deployAge(dep));
     row.innerHTML = `
       <div class="deploy-icon ${iconClass}">${icon}</div>
       <div class="deploy-title-cell">
