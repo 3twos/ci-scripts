@@ -36,10 +36,17 @@
   --radius-lg: 10px;
 }
 
+/* ─── Scalable theme via custom properties ─── */
+html { --scale: 14px; --density: 12px; }
+html.size-s { --scale: 12px; --density: 8px; }
+html.size-m { --scale: 14px; --density: 12px; }
+html.size-l { --scale: 16px; --density: 14px; }
+html.size-xl { --scale: 18px; --density: 16px; }
+
 html, body { height: 100%; }
 body {
   font-family: var(--font);
-  font-size: 14px;
+  font-size: var(--scale);
   color: var(--text);
   background: var(--bg);
   display: flex;
@@ -119,9 +126,9 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   display: grid;
   grid-template-columns: 34px 20px 1fr 150px 110px 120px 32px 80px;
   align-items: center;
-  gap: 8px;
+  gap: var(--density);
   column-gap: 4px;
-  padding: 12px 18px;
+  padding: var(--density) 18px;
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -272,6 +279,39 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+/* ─── Settings Panel ─── */
+.settings-overlay {
+  display: none; position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+}
+.settings-overlay.open { display: flex; justify-content: flex-end; }
+.settings-panel {
+  width: 320px; height: 100%; background: var(--bg2); border-left: 1px solid var(--border);
+  padding: 24px; overflow-y: auto; font-family: var(--font-ui);
+  animation: slideIn 0.15s ease-out;
+}
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.settings-panel h2 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 20px; }
+.settings-section { margin-bottom: 20px; }
+.settings-section label {
+  display: block; font-size: 11px; font-weight: 500; color: var(--text2);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.size-options { display: flex; gap: 6px; }
+.size-opt {
+  flex: 1; padding: 8px 0; text-align: center; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--bg); color: var(--text2);
+  font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  font-family: var(--font-ui);
+}
+.size-opt:hover { border-color: var(--text3); color: var(--text); }
+.size-opt.active { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+.settings-close {
+  position: absolute; top: 16px; right: 16px; background: none; border: none;
+  color: var(--text2); cursor: pointer; font-size: 18px; padding: 4px;
+}
+.settings-close:hover { color: var(--text); }
 </style>
 </head>
 <body>
@@ -299,7 +339,26 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   <button class="header-btn" onclick="doRefresh()" title="Refresh now">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
   </button>
+  <button class="header-btn" onclick="toggleSettings()" title="Settings">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
 </header>
+
+<div class="settings-overlay" id="settings-overlay" onclick="if(event.target===this)toggleSettings()">
+  <div class="settings-panel" style="position:relative">
+    <button class="settings-close" onclick="toggleSettings()">&times;</button>
+    <h2>Appearance</h2>
+    <div class="settings-section">
+      <label>Text Size</label>
+      <div class="size-options" id="size-options">
+        <button class="size-opt" data-size="s" onclick="setSize('s')">S</button>
+        <button class="size-opt" data-size="m" onclick="setSize('m')">M</button>
+        <button class="size-opt" data-size="l" onclick="setSize('l')">L</button>
+        <button class="size-opt" data-size="xl" onclick="setSize('xl')">XL</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <main>
   <div class="empty-state" id="empty-state">
@@ -681,7 +740,7 @@ function renderDeployments(list) {
     else if (state === 'CANCELED') { icon = '\u25A0'; iconClass = 'dep-canceled'; }
     else { icon = '\u25D1'; iconClass = 'dep-building'; }
     const title = dep.changeTitle || dep.branch || '';
-    const branch = dep.branch || '';
+    const branch = (dep.branch && dep.branch !== 'main' && dep.branch !== 'master') ? dep.branch : '';
     const url = dep.url || '#';
     const isActive = ['BUILDING', 'QUEUED', 'INITIALIZING'].includes(state);
     const statusText = isActive
@@ -766,6 +825,23 @@ function selectDeployVoice(name) {
   selectedDeployVoice = voices.find(v => v.name === name) || null;
   try { localStorage.setItem('pr-monitor-deploy-voice', name); } catch {}
 }
+
+// ── Settings ──
+function toggleSettings() {
+  document.getElementById('settings-overlay').classList.toggle('open');
+}
+
+function setSize(size) {
+  document.documentElement.className = 'size-' + size;
+  document.querySelectorAll('.size-opt').forEach(b => b.classList.toggle('active', b.dataset.size === size));
+  try { localStorage.setItem('pr-monitor-size', size); } catch {}
+}
+
+// Restore saved size
+(function() {
+  const saved = localStorage.getItem('pr-monitor-size') || 'l';
+  setSize(saved);
+})();
 
 // ── Init ──
 loadVoices();
