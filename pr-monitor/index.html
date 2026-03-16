@@ -97,7 +97,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 /* ─── Column headers ─── */
 .col-headers {
   display: grid;
-  grid-template-columns: 56px 100px 32px 80px 80px 60px 120px 1fr 90px;
+  grid-template-columns: 56px 1fr 100px 32px 80px 60px 120px 90px;
   gap: 8px;
   padding: 0 18px 6px;
   font-size: 10px;
@@ -112,7 +112,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .pr-list { display: flex; flex-direction: column; gap: 6px; }
 .pr-card {
   display: grid;
-  grid-template-columns: 56px 100px 32px 80px 80px 60px 120px 1fr 90px;
+  grid-template-columns: 56px 1fr 100px 32px 80px 60px 120px 90px;
   align-items: center;
   gap: 8px;
   padding: 12px 18px;
@@ -154,10 +154,6 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .merge-behind { color: var(--yellow); }
 .merge-blocked { color: var(--yellow); }
 .merge-unknown { color: var(--text3); }
-.review-approved { color: var(--green); }
-.review-changes { color: var(--yellow); }
-.review-pending { color: var(--blue); }
-.review-none { color: var(--text3); }
 .threads-warn { color: var(--yellow); font-weight: 600; }
 .threads-ok { color: var(--text3); }
 
@@ -249,7 +245,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   </div>
   <div id="pr-container" style="display:none">
     <div class="col-headers" id="col-headers">
-      <span>#</span><span>status</span><span>ci</span><span>merge</span><span>review</span><span>threads</span><span>reviewers</span><span>title</span><span></span>
+      <span>#</span><span>title</span><span>status</span><span>ci</span><span>merge</span><span>threads</span><span>reviewers</span><span></span>
     </div>
     <div class="pr-list" id="pr-list"></div>
   </div>
@@ -331,23 +327,23 @@ function renderPrs(list, initial) {
     card.dataset.pr = pr.number;
 
     const allRevs = [...new Set([...(pr.reviewers || []), ...(pr.requestedReviewers || [])])].map(shortName).join(', ');
+    const resolved = (pr.totalThreads || 0) - (pr.unresolvedThreads || 0);
     const threadStr = pr.totalThreads > 0
-      ? `${pr.totalThreads - pr.unresolvedThreads}/${pr.totalThreads}`
+      ? `${resolved}/${pr.totalThreads}`
       : '0';
     const threadClass = pr.unresolvedThreads > 0 ? 'threads-warn' : 'threads-ok';
 
     card.innerHTML = `
       <div class="pr-num"><a href="${esc(pr.url)}" target="_blank">#${pr.number}</a></div>
-      <div>${statusBadge(pr)}</div>
-      <div class="cell ${ciClass(pr.ciStatus)}" title="CI: ${pr.ciStatus}">${ciIcon(pr.ciStatus)}</div>
-      <div class="cell ${mergeClass(pr.mergeable, pr.mergeStateStatus)}">${IC.merge} ${mergeText(pr.mergeable, pr.mergeStateStatus)}</div>
-      <div class="cell ${reviewClass(pr.reviewState)}">${IC.review} ${reviewText(pr.reviewState)}</div>
-      <div class="cell ${threadClass}">${IC.comment} ${threadStr}</div>
-      <div class="cell" style="color:var(--text2)" title="${esc(allRevs)}">${allRevs ? IC.people + ' ' + esc(allRevs) : '<span style="color:var(--text3)">&mdash;</span>'}</div>
       <div class="pr-title-cell">
         <a href="${esc(pr.url)}" target="_blank" title="${esc(pr.title)}">${esc(pr.title)}</a>
         <div class="pr-branch">${esc(pr.branch)}</div>
       </div>
+      <div>${statusBadge(pr)}</div>
+      <div class="cell ${ciClass(pr.ciStatus)}" title="CI: ${pr.ciStatus}">${ciIcon(pr.ciStatus)}</div>
+      <div class="cell ${mergeClass(pr.mergeable, pr.mergeStateStatus)}">${IC.merge} ${mergeText(pr.mergeable, pr.mergeStateStatus)}</div>
+      <div class="cell ${threadClass}">${IC.comment} ${threadStr}</div>
+      <div class="cell" style="color:var(--text2)" title="${esc(allRevs)}">${allRevs ? IC.people + ' ' + esc(allRevs) : '<span style="color:var(--text3)">&mdash;</span>'}</div>
       <div style="text-align:right">
         <button class="merge-btn" ${pr.isReady ? '' : 'disabled'} onclick="doMerge(${pr.number}, this)" title="${pr.isReady ? 'Squash and merge' : 'Not ready'}">
           ${IC.squash} Merge
@@ -393,8 +389,6 @@ function mergeText(m, s) {
   if (m === 'CONFLICTING') return 'conflict';
   return { CLEAN:'clean', BEHIND:'behind', BLOCKED:'blocked', DIRTY:'dirty', UNSTABLE:'unstable', UNKNOWN:'\u2014' }[s] || s;
 }
-function reviewClass(s) { return { approved:'review-approved', changes:'review-changes', pending:'review-pending', none:'review-none' }[s] || 'review-none'; }
-function reviewText(s) { return { approved:'approved', changes:'changes', pending:'reviewed', none:'none' }[s] || s; }
 function shortName(l) { return l.startsWith('copilot') ? 'copilot' : l.split(/[-_.]/)[0]; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
