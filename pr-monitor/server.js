@@ -216,8 +216,9 @@ function derivePrState(pr, detail) {
   else if (reviews.length > 0) pr.reviewState = 'pending';
   else pr.reviewState = 'none';
 
-  // Ready
-  pr.isReady = pr.ciStatus === 'passing' && pr.mergeable === 'MERGEABLE' && pr.reviewDecision === 'APPROVED' && !pr.isDraft;
+  // Ready: CI passing + mergeable + not draft + (approved OR no review required)
+  const reviewOk = pr.reviewDecision === 'APPROVED' || (pr.reviewDecision === '' && pr.mergeStateStatus !== 'BLOCKED');
+  pr.isReady = pr.ciStatus === 'passing' && pr.mergeable === 'MERGEABLE' && reviewOk && !pr.isDraft;
   pr.updatedAt = Date.now();
 }
 
