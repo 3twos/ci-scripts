@@ -843,7 +843,7 @@ function requestHandler(req, res) {
 async function handleMerge(prNumber, res) {
   try {
     log(`Merging PR #${prNumber} (squash)...`);
-    await gh(['pr', 'merge', String(prNumber), '-R', config.repo, '--squash', '--delete-branch']);
+    await gh(['pr', 'merge', String(prNumber), '-R', config.repo, '--squash']);
     log(`PR #${prNumber} merged successfully`);
     const alert = { ts: Date.now(), level: 'success', message: `${prNumber} merged`, prNumber: Number(prNumber) };
     alertLog.push(alert);
