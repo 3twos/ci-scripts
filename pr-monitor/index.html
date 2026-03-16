@@ -97,7 +97,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 /* ─── Column headers ─── */
 .col-headers {
   display: grid;
-  grid-template-columns: 56px 100px 80px 80px 80px 60px 120px 1fr 90px;
+  grid-template-columns: 56px 100px 32px 80px 80px 60px 120px 1fr 90px;
   gap: 8px;
   padding: 0 18px 6px;
   font-size: 10px;
@@ -112,7 +112,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .pr-list { display: flex; flex-direction: column; gap: 6px; }
 .pr-card {
   display: grid;
-  grid-template-columns: 56px 100px 80px 80px 80px 60px 120px 1fr 90px;
+  grid-template-columns: 56px 100px 32px 80px 80px 60px 120px 1fr 90px;
   align-items: center;
   gap: 8px;
   padding: 12px 18px;
@@ -339,7 +339,7 @@ function renderPrs(list, initial) {
     card.innerHTML = `
       <div class="pr-num"><a href="${esc(pr.url)}" target="_blank">#${pr.number}</a></div>
       <div>${statusBadge(pr)}</div>
-      <div class="cell ${ciClass(pr.ciStatus)}">${IC.ci} ${pr.ciStatus}</div>
+      <div class="cell ${ciClass(pr.ciStatus)}" title="CI: ${pr.ciStatus}">${ciIcon(pr.ciStatus)}</div>
       <div class="cell ${mergeClass(pr.mergeable, pr.mergeStateStatus)}">${IC.merge} ${mergeText(pr.mergeable, pr.mergeStateStatus)}</div>
       <div class="cell ${reviewClass(pr.reviewState)}">${IC.review} ${reviewText(pr.reviewState)}</div>
       <div class="cell ${threadClass}">${IC.comment} ${threadStr}</div>
@@ -382,6 +382,9 @@ function statusBadge(pr) {
 }
 
 function ciClass(s) { return { passing:'ci-pass', failing:'ci-fail', pending:'ci-pend', none:'ci-none' }[s] || 'ci-none'; }
+function ciIcon(s) {
+  return { passing:'\u2714', failing:'\u2718', pending:'\u25D1', none:'\u2014' }[s] || s;
+}
 function mergeClass(m, s) {
   if (m === 'CONFLICTING') return 'merge-conflict';
   return { CLEAN:'merge-clean', BEHIND:'merge-behind', BLOCKED:'merge-blocked', DIRTY:'merge-conflict' }[s] || 'merge-unknown';
