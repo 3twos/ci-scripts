@@ -484,9 +484,9 @@ async function refreshAllPrs() {
           fetchPrDetail(num),
           fetchThreadCounts(num),
         ]);
-        derivePrState(pr, detail);
         pr.unresolvedThreads = threads.unresolved;
         pr.totalThreads = threads.total;
+        derivePrState(pr, detail);
         const alerts = detectTransitions(pr);
         allAlerts.push(...alerts);
         lastRefreshMs.set(num, Date.now());
@@ -521,8 +521,9 @@ async function refreshSinglePr(number) {
       fetchPrDetail(number),
       fetchThreadCounts(number),
     ]);
+    pr.unresolvedThreads = threads.unresolved;
+    pr.totalThreads = threads.total;
     derivePrState(pr, detail);
-    pr.unresolvedThreads = threads;
 
     const alerts = detectTransitions(pr);
     lastRefreshMs.set(number, Date.now());
