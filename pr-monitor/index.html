@@ -97,7 +97,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 /* ─── Column headers ─── */
 .col-headers {
   display: grid;
-  grid-template-columns: 40px 28px 1fr 140px 120px 32px 80px 60px 120px;
+  grid-template-columns: 36px 24px 1fr 150px 110px 120px 32px 80px;
   gap: 8px;
   padding: 0 18px 6px;
   font-size: 10px;
@@ -112,10 +112,10 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .pr-list { display: flex; flex-direction: column; gap: 6px; }
 .pr-card {
   display: grid;
-  grid-template-columns: 40px 28px 1fr 140px 120px 32px 80px 60px 120px;
+  grid-template-columns: 36px 24px 1fr 150px 110px 120px 32px 80px;
   align-items: center;
   gap: 8px;
-  column-gap: 8px;
+  column-gap: 6px;
   padding: 12px 18px;
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -261,7 +261,7 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
   </div>
   <div id="pr-container" style="display:none">
     <div class="col-headers" id="col-headers">
-      <span>#</span><span></span><span>title</span><span>review</span><span>status</span><span>ci</span><span>merge</span><span>threads</span><span>reviewers</span>
+      <span>#</span><span></span><span>title</span><span>review</span><span>reviewers</span><span>status</span><span>ci</span><span>merge</span>
     </div>
     <div class="pr-list" id="pr-list"></div>
   </div>
@@ -351,17 +351,16 @@ function renderPrs(list, initial) {
 
     card.innerHTML = `
       <div class="pr-num"><a href="${esc(pr.url)}" target="_blank">#${pr.number}</a></div>
-      <div class="size-${(pr.sizeLabel||'s').toLowerCase()}" title="${pr.additions}+ ${pr.deletions}- ${pr.changedFiles} files" style="font-size:10px;font-weight:600;text-align:center">${pr.sizeLabel || '?'}</div>
+      <div class="size-${(pr.sizeLabel||'s').toLowerCase()}" title="${pr.additions}+ ${pr.deletions}- ${pr.changedFiles} files" style="font-size:11px;text-align:center">${sizeIcon(pr.sizeLabel)}</div>
       <div class="pr-title-cell">
         <a href="${esc(pr.url)}" target="_blank" title="${esc(pr.title)}">${esc(pr.title)}</a>
         <div class="pr-branch">${esc(pr.branch)}</div>
       </div>
-      <div class="complexity-cell">${complexityColumn(pr)}</div>
+      <div class="complexity-cell">${complexityColumn(pr, threadStr, threadClass)}</div>
+      <div class="cell" style="color:var(--text2);font-size:11px" title="${esc(allRevs)}">${allRevs ? esc(allRevs) : '<span style="color:var(--text3)">\u2014</span>'}</div>
       <div>${statusCell(pr)}</div>
       <div class="cell ${ciClass(pr.ciStatus)}" title="CI: ${pr.ciStatus}">${ciIcon(pr.ciStatus)}</div>
       <div class="cell ${mergeClass(pr.mergeable, pr.mergeStateStatus)}">${IC.merge} ${mergeText(pr.mergeable, pr.mergeStateStatus)}</div>
-      <div class="cell ${threadClass}">${IC.comment} ${threadStr}</div>
-      <div class="cell" style="color:var(--text2)" title="${esc(allRevs)}">${allRevs ? IC.people + ' ' + esc(allRevs) : '<span style="color:var(--text3)">&mdash;</span>'}</div>
     `;
     frag.appendChild(card);
   }
@@ -419,14 +418,22 @@ function mergeText(m, s) {
   if (m === 'CONFLICTING') return 'conflict';
   return { CLEAN:'clean', BEHIND:'behind', BLOCKED:'blocked', DIRTY:'dirty', UNSTABLE:'unstable', UNKNOWN:'\u2014' }[s] || s;
 }
-function complexityColumn(pr) {
+function complexityColumn(pr, threadStr, threadClass) {
   const s = pr.commentSeverity || {};
   const lines = [];
   if (s.critical > 0) lines.push(`<div class="sev-critical">\u26A0 ${s.critical} critical</div>`);
   if (s.suggestion > 0) lines.push(`<div class="sev-suggestion">${s.suggestion} suggestion${s.suggestion>1?'s':''}</div>`);
   if (s.note > 0) lines.push(`<div class="sev-note">${s.note} note${s.note>1?'s':''}</div>`);
+  // Thread progress
+  if (pr.totalThreads > 0) {
+    lines.push(`<div class="${threadClass}">${threadStr} resolved</div>`);
+  }
   if (lines.length === 0) return '<span style="color:var(--text3)">\u2014</span>';
   return lines.join('');
+}
+function sizeIcon(label) {
+  const icons = { XS: '\u2219', S: '\u25CB', M: '\u25D0', L: '\u25C9', XL: '\u2B24' };
+  return (icons[label] || '\u2219') + ' ' + (label || '?');
 }
 function shortName(l) { return l.startsWith('copilot') ? 'copilot' : l.split(/[-_.]/)[0]; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
