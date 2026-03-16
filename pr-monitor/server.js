@@ -778,16 +778,19 @@ function routeWebhookEvent(eventType, payload) {
 // HTTP Server
 // ---------------------------------------------------------------------------
 
-const BUILD_VERSION = new Date().toISOString().replace('T', ' ').slice(0, 16);
-const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8')
-  .replace('__BUILD_VERSION__', BUILD_VERSION);
+const HTML_PATH = path.join(__dirname, 'index.html');
+
+function getIndexHtml() {
+  const version = new Date().toISOString().replace('T', ' ').slice(0, 16);
+  return fs.readFileSync(HTML_PATH, 'utf8').replace('__BUILD_VERSION__', version);
+}
 
 function requestHandler(req, res) {
   const url = req.url?.split('?')[0];
 
   if (req.method === 'GET' && url === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(indexHtml);
+    res.end(getIndexHtml());
     return;
   }
 
