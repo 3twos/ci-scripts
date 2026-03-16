@@ -167,10 +167,10 @@ main { flex: 1; overflow: auto; padding: 20px 24px; }
 .pr-branch { font-size: 11px; color: var(--text3); margin-top: 2px; font-family: var(--mono);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .size-xs { color: var(--text3); }
-.size-s { color: var(--green); }
+.size-s { color: var(--text3); }
 .size-m { color: var(--blue); }
 .size-l { color: var(--yellow); }
-.size-xl { color: var(--red); font-weight: 600; }
+.size-xl { color: var(--red); }
 .sev-critical { color: var(--red); font-weight: 600; }
 .sev-suggestion { color: var(--yellow); }
 .sev-note { color: var(--text2); }
@@ -431,8 +431,9 @@ function complexityColumn(pr, threadStr, threadClass) {
   return lines.join('');
 }
 function sizeIcon(label) {
-  const icons = { XS: '\u2219', S: '\u25CB', M: '\u25D0', L: '\u25C9', XL: '\u2B24' };
-  return (icons[label] || '\u2219') + ' ' + (label || '?');
+  // Vertical bars: more bars = bigger PR
+  const bars = { XS: '\u2581', S: '\u2582', M: '\u2584', L: '\u2586', XL: '\u2588' };
+  return (bars[label] || '\u2581');
 }
 function shortName(l) { return l.startsWith('copilot') ? 'copilot' : l.split(/[-_.]/)[0]; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
