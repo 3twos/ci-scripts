@@ -378,28 +378,27 @@ function hasChanged(pr) {
 }
 
 function statusCell(pr) {
-  const isBehind = ['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
+  // "needs update" = actually behind base branch, not just blocked by protection rules
+  const needsUpdate = ['BEHIND', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
 
   // Actionable: ready to merge
   if (pr.isReady) return `<button class="action-btn btn-merge" onclick="doMerge(${pr.number}, this)">${IC.squash} Merge</button>`;
 
   // Updating states
   if (pr.isUpdating) return '<span class="action-btn btn-updating">\u25D1 Updating</span>';
-  if (isBehind && pr.ciStatus === 'pending') return '<span class="action-btn btn-updating">\u25D1 CI Running</span>';
+  if (needsUpdate && pr.ciStatus === 'pending') return '<span class="action-btn btn-updating">\u25D1 CI Running</span>';
 
-  // Non-actionable blockers (show badge, not button)
+  // Non-actionable blockers
   if (pr.isDraft) return '<span class="badge badge-draft">Draft</span>';
   if (pr.mergeable === 'CONFLICTING') return '<span class="badge badge-conflict">Conflict</span>';
   if (pr.ciStatus === 'failing') return '<span class="badge badge-ci-fail">CI Fail</span>';
   if (pr.ciStatus === 'pending') return '<span class="badge badge-pending">CI Pending</span>';
 
-  // Behind but no other blocker — actionable update
-  if (isBehind) return `<button class="action-btn btn-update" onclick="doUpdate(${pr.number}, this)">\u2191 Update</button>`;
+  // Behind — actionable update
+  if (needsUpdate) return `<button class="action-btn btn-update" onclick="doUpdate(${pr.number}, this)">\u2191 Update</button>`;
 
   // Review blockers
   if (pr.reviewState === 'changes') return '<span class="badge badge-review">Changes</span>';
-
-  // Almost ready but needs review
   if (pr.reviewState === 'none' && !pr.isDraft) return '<span class="badge badge-no-review">No Review</span>';
   if (pr.reviewState === 'pending') return '<span class="badge badge-pending">Reviewed</span>';
 

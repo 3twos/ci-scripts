@@ -288,9 +288,9 @@ function detectTransitions(pr) {
     else if (pr.isReady) { suffix = ', ready to merge'; pr._announced.ready = true; }
     else if (pr.reviewState === 'approved') suffix = ', approved';
     else if (pr.reviewState === 'none' && !pr.isDraft) { suffix = ', no review requested'; pr._announced.noReview = true; }
-    else if (['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus)) suffix = ', behind';
+    else if (['BEHIND', 'DIRTY'].includes(pr.mergeStateStatus)) suffix = ', behind';
     alert('info', `${num} created${suffix}`);
-    if (['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING' && config.autoUpdate) tryUpdateBranch(num);
+    if (['BEHIND', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING' && config.autoUpdate) tryUpdateBranch(num);
     return alerts;
   }
 
@@ -331,7 +331,7 @@ function detectTransitions(pr) {
   }
 
   // Behind / blocked — queue for sequential auto-update
-  const needsUpdate = ['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
+  const needsUpdate = ['BEHIND', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
   if (needsUpdate && config.autoUpdate) {
     enqueueUpdate(num);
   } else {
@@ -361,7 +361,7 @@ function detectTransitions(pr) {
   if (!pr.isReady) pr._announced.ready = false;
 
   // "Still" reminders
-  const isBehind = ['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
+  const isBehind = ['BEHIND', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
   const hasIssue = pr.mergeable === 'CONFLICTING' || pr.ciStatus === 'failing' || pr.reviewState === 'changes' || isBehind;
   const issueDesc = pr.mergeable === 'CONFLICTING' ? 'has conflicts'
     : pr.ciStatus === 'failing' ? 'CI failing'
