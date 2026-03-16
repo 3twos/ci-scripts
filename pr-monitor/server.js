@@ -1254,7 +1254,32 @@ async function main() {
 
   await checkPrereqs();
 
-  // Vercel config resolution
+  // Vercel config resolution — auto-detect .vercel/project.json
+  if (!config.vercelRepo) {
+    // Try CWD first, then git toplevel
+    for (const candidate of [process.cwd()]) {
+      try {
+        const p = path.join(candidate, '.vercel', 'project.json');
+        fs.accessSync(p);
+        config.vercelRepo = candidate;
+        break;
+      } catch {}
+    }
+    if (!config.vercelRepo) {
+      try {
+        const toplevel = await new Promise((resolve, reject) => {
+          execFile('git', ['rev-parse', '--show-toplevel'], { timeout: 3000 }, (err, stdout) => {
+            if (err) return reject(err);
+            resolve(stdout.trim());
+          });
+        });
+        const p = path.join(toplevel, '.vercel', 'project.json');
+        fs.accessSync(p);
+        config.vercelRepo = toplevel;
+      } catch {}
+    }
+  }
+
   if (config.vercelRepo) {
     try {
       const projectJsonPath = path.join(config.vercelRepo, '.vercel', 'project.json');
