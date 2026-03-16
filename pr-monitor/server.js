@@ -138,6 +138,7 @@ function makePrState(raw) {
     reviewCount: 0,
     reviewers: [],
     unresolvedThreads: 0,
+    totalThreads: 0,
     requestedReviewers: [],
     isReady: false,
     updatedAt: Date.now(),
@@ -165,15 +166,17 @@ async function fetchPrDetail(number) {
   return ghJson(['pr', 'view', String(number), '-R', config.repo, '--json', fields]);
 }
 
-async function fetchUnresolvedThreads(number) {
+async function fetchThreadCounts(number) {
   const [owner, name] = config.repo.split('/');
   const query = `query($o:String!,$n:String!,$num:Int!){repository(owner:$o,name:$n){pullRequest(number:$num){reviewThreads(first:100){nodes{isResolved}}}}}`;
   try {
     const result = await ghJson(['api', 'graphql', '-f', `query=${query}`, '-F', `o=${owner}`, '-F', `n=${name}`, '-F', `num=${number}`]);
     const threads = result.data?.repository?.pullRequest?.reviewThreads?.nodes || [];
-    return threads.filter(t => !t.isResolved).length;
+    const total = threads.length;
+    const unresolved = threads.filter(t => !t.isResolved).length;
+    return { unresolved, total };
   } catch {
-    return 0;
+    return { unresolved: 0, total: 0 };
   }
 }
 
@@ -391,10 +394,11 @@ async function refreshAllPrs() {
         pr._prev = snapshot(pr);
         const [detail, threads] = await Promise.all([
           fetchPrDetail(num),
-          fetchUnresolvedThreads(num),
+          fetchThreadCounts(num),
         ]);
         derivePrState(pr, detail);
-        pr.unresolvedThreads = threads;
+        pr.unresolvedThreads = threads.unresolved;
+        pr.totalThreads = threads.total;
         const alerts = detectTransitions(pr);
         allAlerts.push(...alerts);
         lastRefreshMs.set(num, Date.now());
@@ -427,7 +431,7 @@ async function refreshSinglePr(number) {
 
     const [detail, threads] = await Promise.all([
       fetchPrDetail(number),
-      fetchUnresolvedThreads(number),
+      fetchThreadCounts(number),
     ]);
     derivePrState(pr, detail);
     pr.unresolvedThreads = threads;
@@ -512,6 +516,7 @@ function serializePr(pr) {
     reviewCount: pr.reviewCount,
     reviewers: pr.reviewers,
     unresolvedThreads: pr.unresolvedThreads,
+    totalThreads: pr.totalThreads,
     requestedReviewers: pr.requestedReviewers,
     isReady: pr.isReady,
     updatedAt: pr.updatedAt,
@@ -662,8 +667,40 @@ function requestHandler(req, res) {
     return;
   }
 
+  // POST /api/merge/:number — squash merge a PR
+  const mergeMatch = req.method === 'POST' && url.match(/^\/api\/merge\/(\d+)$/);
+  if (mergeMatch) {
+    const prNumber = mergeMatch[1];
+    handleMerge(prNumber, res);
+    return;
+  }
+
   res.writeHead(404);
   res.end('Not found');
+}
+
+async function handleMerge(prNumber, res) {
+  try {
+    log(`Merging PR #${prNumber} (squash)...`);
+    await gh(['pr', 'merge', String(prNumber), '-R', config.repo, '--squash', '--delete-branch']);
+    log(`PR #${prNumber} merged successfully`);
+    const alert = { ts: Date.now(), level: 'success', message: `${prNumber} merged`, prNumber: Number(prNumber) };
+    alertLog.push(alert);
+    if (alertLog.length > MAX_ALERTS) alertLog.shift();
+    broadcastAlert(alert);
+    // Refresh to remove merged PR
+    setTimeout(() => refreshAllPrs(), 1000);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+  } catch (e) {
+    log(`Merge failed for PR #${prNumber}: ${e.message}`);
+    const alert = { ts: Date.now(), level: 'error', message: `${prNumber} merge failed: ${e.message}`, prNumber: Number(prNumber) };
+    alertLog.push(alert);
+    if (alertLog.length > MAX_ALERTS) alertLog.shift();
+    broadcastAlert(alert);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: e.message }));
+  }
 }
 
 // ---------------------------------------------------------------------------
