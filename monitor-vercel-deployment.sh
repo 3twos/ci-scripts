@@ -2983,13 +2983,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Try macOS Keychain if token not set
+if [[ -z "$TOKEN" ]] && command -v security >/dev/null 2>&1; then
+  TOKEN="$(security find-generic-password -a "$USER" -s "vercel-token" -w 2>/dev/null)" || true
+fi
+
 if [[ -z "$TOKEN" && -t 0 ]]; then
   read -r -s -p "Vercel token: " TOKEN
   echo
 fi
 
 if [[ -z "$TOKEN" ]]; then
-  print_error "Missing token. Use VERCEL_TOKEN, --token, or secure prompt in an interactive terminal."
+  print_error "Missing token. Set VERCEL_TOKEN, store in Keychain (security add-generic-password -a \$USER -s vercel-token -w), use --token, or run interactively."
   exit 1
 fi
 
