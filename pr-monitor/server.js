@@ -147,7 +147,6 @@ function makePrState(raw) {
     _announced: { created: false, conflicts: false, ciFail: false, noReview: false, ready: false },
     _issueSinceEpoch: 0,
     _lastStillEpoch: 0,
-    _lastUpdateAttempt: 0,
   };
 }
 
@@ -295,18 +294,12 @@ function detectTransitions(pr) {
     alert('success', `${num} conflicts resolved`);
   }
 
-  // Behind / blocked — auto-update branch
+  // Behind / blocked — queue for sequential auto-update
   const needsUpdate = ['BEHIND', 'BLOCKED', 'DIRTY'].includes(pr.mergeStateStatus) && pr.mergeable !== 'CONFLICTING';
   if (needsUpdate && config.autoUpdate) {
-    const prevNeedsUpdate = prev && ['BEHIND', 'BLOCKED', 'DIRTY'].includes(prev.mergeStateStatus);
-    // Update on first detection, then retry every 60s
-    const lastUpdate = pr._lastUpdateAttempt || 0;
-    if (!prevNeedsUpdate || (Date.now() - lastUpdate) > 60_000) {
-      pr._lastUpdateAttempt = Date.now();
-      tryUpdateBranch(num);
-    }
+    enqueueUpdate(num);
   } else {
-    pr._lastUpdateAttempt = 0;
+    dequeueUpdate(num);
   }
 
   // CI
@@ -360,20 +353,83 @@ function shortName(login) {
   return login.split(/[-_.]/)[0];
 }
 
-function tryUpdateBranch(number) {
-  log(`Updating branch for PR #${number}...`);
+// ---------------------------------------------------------------------------
+// Sequential Branch Update Queue
+// ---------------------------------------------------------------------------
+// Updates one PR at a time. Waits for CI to pass (CLEAN) before moving on.
+// Prevents the cascade where updating all at once puts each other behind again.
+
+const updateQueue = [];       // PR numbers waiting for update
+let updateInFlight = null;    // PR number currently being updated/awaiting CI
+let updateRetryTimer = null;
+
+function enqueueUpdate(number) {
+  if (updateInFlight === number) return;
+  if (updateQueue.includes(number)) return;
+  updateQueue.push(number);
+  processUpdateQueue();
+}
+
+function dequeueUpdate(number) {
+  const idx = updateQueue.indexOf(number);
+  if (idx >= 0) updateQueue.splice(idx, 1);
+  if (updateInFlight === number) {
+    // PR is now clean — move to next
+    updateInFlight = null;
+    processUpdateQueue();
+  }
+}
+
+function processUpdateQueue() {
+  if (updateInFlight !== null) return;
+  if (updateQueue.length === 0) return;
+
+  const number = updateQueue.shift();
+
+  // Verify it still needs update
+  const pr = prStore.get(number);
+  if (!pr || pr.mergeStateStatus === 'CLEAN') {
+    processUpdateQueue();
+    return;
+  }
+
+  updateInFlight = number;
+  log(`Updating branch for PR #${number} (${updateQueue.length} queued)...`);
+
   gh(['pr', 'update-branch', String(number), '-R', config.repo]).then(
     () => {
-      log(`PR #${number} branch updated`);
+      log(`PR #${number} branch updated — waiting for CI`);
       const a = { ts: Date.now(), level: 'info', message: `PR ${number} branch updated`, prNumber: number };
       alertLog.push(a); if (alertLog.length > MAX_ALERTS) alertLog.shift();
       broadcastAlert(a);
-      setTimeout(() => refreshSinglePr(number), 3000);
+      // Poll this PR until it becomes CLEAN, then move on
+      scheduleUpdateCheck(number);
     },
     (e) => {
       log(`PR #${number} branch update failed: ${e.message}`);
+      updateInFlight = null;
+      processUpdateQueue();
     }
   );
+}
+
+function scheduleUpdateCheck(number) {
+  clearTimeout(updateRetryTimer);
+  updateRetryTimer = setTimeout(async () => {
+    if (updateInFlight !== number) return;
+    try {
+      await refreshSinglePr(number);
+    } catch {}
+    const pr = prStore.get(number);
+    if (!pr || pr.mergeStateStatus === 'CLEAN') {
+      log(`PR #${number} is clean — next in queue`);
+      updateInFlight = null;
+      processUpdateQueue();
+    } else {
+      // Still not clean, check again
+      scheduleUpdateCheck(number);
+    }
+  }, 15000);
 }
 
 // ---------------------------------------------------------------------------
