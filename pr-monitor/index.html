@@ -351,7 +351,7 @@ function renderPrs(list, initial) {
 
     card.innerHTML = `
       <div class="pr-num"><a href="${esc(pr.url)}" target="_blank">#${pr.number}</a></div>
-      <div class="size-${(pr.sizeLabel||'s').toLowerCase()}" title="${pr.additions}+ ${pr.deletions}- ${pr.changedFiles} files" style="font-size:11px;text-align:center">${sizeIcon(pr.sizeLabel)}</div>
+      <div class="size-${(pr.sizeLabel||'xs').toLowerCase()}" title="${pr.additions}+ ${pr.deletions}- ${pr.changedFiles} files" style="font-size:16px;text-align:center;line-height:1">${sizeIcon(pr.sizeLabel)}</div>
       <div class="pr-title-cell">
         <a href="${esc(pr.url)}" target="_blank" title="${esc(pr.title)}">${esc(pr.title)}</a>
         <div class="pr-branch">${esc(pr.branch)}</div>
