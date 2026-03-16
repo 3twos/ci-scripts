@@ -112,6 +112,8 @@ PR_REVIEW_DECISION=()  # "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | 
 PR_REVIEW_STATE=()     # "none" | "pending" | "changes" | "approved"
 PR_REVIEW_COUNT=()     # number of reviews (includes approvals, change requests, and comments)
 PR_LATEST_REVIEWERS=() # comma-separated reviewer logins
+PR_UNRESOLVED_THREADS=() # number of unresolved review threads
+PR_REQUESTED_REVIEWERS=() # comma-separated requested reviewer logins
 PR_IS_READY=()         # 0 | 1
 
 # Previous state (for transition detection)
@@ -246,6 +248,10 @@ const reviewCount = reviews.length;
 const reviewers = [...reviewerSet].join(",") || "-";
 
 const reviewRequests = pr.reviewRequests || [];
+const requestedReviewers = reviewRequests
+  .map(r => r.login || (r.name ? `team:${r.name}` : ""))
+  .filter(Boolean)
+  .join(",") || "-";
 const hasRequestedReviewers = reviewRequests.length > 0;
 
 let reviewState = "none";
@@ -261,7 +267,7 @@ if (reviewDecision === "APPROVED") {
   reviewState = "none";
 }
 
-console.log([mergeable, mergeState, ciStatus, reviewDecision, reviewCount, reviewers, isDraft, reviewState].join("\t"));
+console.log([mergeable, mergeState, ciStatus, reviewDecision, reviewCount, reviewers, isDraft, reviewState, requestedReviewers].join("\t"));
 ' <<< "$raw_json" 2>/dev/null)" || {
     warn_line "Failed to parse detail JSON for PR #${pr_number}."
     return 1
@@ -275,8 +281,18 @@ console.log([mergeable, mergeState, ciStatus, reviewDecision, reviewCount, revie
   DETAIL_REVIEWERS=""
   DETAIL_IS_DRAFT=""
   DETAIL_REVIEW_STATE=""
+  DETAIL_REQUESTED_REVIEWERS=""
 
-  IFS=$'\t' read -r DETAIL_MERGEABLE DETAIL_MERGE_STATE DETAIL_CI_STATUS DETAIL_REVIEW_DECISION DETAIL_REVIEW_COUNT DETAIL_REVIEWERS DETAIL_IS_DRAFT DETAIL_REVIEW_STATE <<< "$parsed_output"
+  IFS=$'\t' read -r DETAIL_MERGEABLE DETAIL_MERGE_STATE DETAIL_CI_STATUS DETAIL_REVIEW_DECISION DETAIL_REVIEW_COUNT DETAIL_REVIEWERS DETAIL_IS_DRAFT DETAIL_REVIEW_STATE DETAIL_REQUESTED_REVIEWERS <<< "$parsed_output"
+
+  # Fetch unresolved thread count via GraphQL
+  DETAIL_UNRESOLVED_THREADS="0"
+  local repo_owner="${REPO_SLUG%%/*}"
+  local repo_name="${REPO_SLUG##*/}"
+  local gql_result
+  if gql_result="$(gh api graphql -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}}}}' -F owner="$repo_owner" -F name="$repo_name" -F number="$pr_number" 2>/dev/null)"; then
+    DETAIL_UNRESOLVED_THREADS="$(printf '%s' "$gql_result" | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8"));const t=d.data?.repository?.pullRequest?.reviewThreads?.nodes||[];console.log(t.filter(n=>!n.isResolved).length)' 2>/dev/null)" || DETAIL_UNRESOLVED_THREADS="0"
+  fi
 }
 
 reconcile_pr_list() {
@@ -318,6 +334,8 @@ reconcile_pr_list() {
       PR_REVIEW_STATE+=("none")
       PR_REVIEW_COUNT+=("0")
       PR_LATEST_REVIEWERS+=("")
+      PR_UNRESOLVED_THREADS+=("0")
+      PR_REQUESTED_REVIEWERS+=("")
       PR_IS_READY+=("0")
 
       PR_PREV_MERGEABLE+=("UNKNOWN")
@@ -362,7 +380,7 @@ reconcile_pr_list() {
 
   if (( keep_count < ${#PR_NUMBERS[@]} )); then
     local tmp_numbers=() tmp_titles=() tmp_authors=() tmp_branches=() tmp_urls=() tmp_draft=()
-    local tmp_mergeable=() tmp_merge_state=() tmp_ci=() tmp_review_dec=() tmp_review_state=() tmp_review_cnt=() tmp_reviewers=() tmp_ready=()
+    local tmp_mergeable=() tmp_merge_state=() tmp_ci=() tmp_review_dec=() tmp_review_state=() tmp_review_cnt=() tmp_reviewers=() tmp_unresolved=() tmp_requested=() tmp_ready=()
     local tmp_prev_m=() tmp_prev_ms=() tmp_prev_ci=() tmp_prev_rd=() tmp_prev_rs=() tmp_prev_rc=() tmp_prev_rdy=()
     local tmp_issue_since=() tmp_ann_still=()
     local tmp_ann_c=() tmp_ann_conf=() tmp_ann_ci=() tmp_ann_nr=() tmp_ann_rdy=()
@@ -382,6 +400,8 @@ reconcile_pr_list() {
       tmp_review_state+=("${PR_REVIEW_STATE[idx]}")
       tmp_review_cnt+=("${PR_REVIEW_COUNT[idx]}")
       tmp_reviewers+=("${PR_LATEST_REVIEWERS[idx]}")
+      tmp_unresolved+=("${PR_UNRESOLVED_THREADS[idx]}")
+      tmp_requested+=("${PR_REQUESTED_REVIEWERS[idx]}")
       tmp_ready+=("${PR_IS_READY[idx]}")
 
       tmp_prev_m+=("${PR_PREV_MERGEABLE[idx]}")
@@ -416,6 +436,8 @@ reconcile_pr_list() {
     PR_REVIEW_STATE=("${tmp_review_state[@]+"${tmp_review_state[@]}"}")
     PR_REVIEW_COUNT=("${tmp_review_cnt[@]+"${tmp_review_cnt[@]}"}")
     PR_LATEST_REVIEWERS=("${tmp_reviewers[@]+"${tmp_reviewers[@]}"}")
+    PR_UNRESOLVED_THREADS=("${tmp_unresolved[@]+"${tmp_unresolved[@]}"}")
+    PR_REQUESTED_REVIEWERS=("${tmp_requested[@]+"${tmp_requested[@]}"}")
     PR_IS_READY=("${tmp_ready[@]+"${tmp_ready[@]}"}")
 
     PR_PREV_MERGEABLE=("${tmp_prev_m[@]+"${tmp_prev_m[@]}"}")
@@ -465,6 +487,9 @@ refresh_pr_details() {
     PR_REVIEW_COUNT[i]="${DETAIL_REVIEW_COUNT:-0}"
     PR_LATEST_REVIEWERS[i]="${DETAIL_REVIEWERS:-}"
     [[ "${PR_LATEST_REVIEWERS[i]}" == "-" ]] && PR_LATEST_REVIEWERS[i]=""
+    PR_UNRESOLVED_THREADS[i]="${DETAIL_UNRESOLVED_THREADS:-0}"
+    PR_REQUESTED_REVIEWERS[i]="${DETAIL_REQUESTED_REVIEWERS:-}"
+    [[ "${PR_REQUESTED_REVIEWERS[i]}" == "-" ]] && PR_REQUESTED_REVIEWERS[i]=""
     if [[ -n "$DETAIL_IS_DRAFT" ]]; then
       PR_IS_DRAFT[i]="$DETAIL_IS_DRAFT"
     fi
@@ -885,8 +910,8 @@ render_dashboard() {
   if (( ${#PR_NUMBERS[@]} == 0 )); then
     print_dashboard_line "No open PRs found."
   else
-    print_dashboard_linef ' %-5s %-10s  %-2s %-9s %-9s %s' "#" "Status" "CI" "Merge" "Review" "Title"
-    print_dashboard_linef ' %-5s %-10s  %-2s %-9s %-9s %s' "----" "----------" "--" "---------" "---------" "------------------------------------------------"
+    print_dashboard_linef ' %-5s %-10s  %-2s %-9s %-9s %-5s %-20s %s' "#" "Status" "CI" "Merge" "Review" "Cmt" "Reviewers" "Title"
+    print_dashboard_linef ' %-5s %-10s  %-2s %-9s %-9s %-5s %-20s %s' "----" "----------" "--" "---------" "---------" "-----" "--------------------" "--------------------------------------------"
 
     for (( i = 0; i < ${#PR_NUMBERS[@]}; i++ )); do
       status_icon="$(pr_status_icon "$i")"
@@ -896,9 +921,59 @@ render_dashboard() {
       review_lbl="$(review_label "${PR_REVIEW_STATE[i]}")"
       title_short="$(truncate_text "${PR_TITLES[i]}" 48)"
 
-      printf '\r\033[2K %-5s %s %s  %s %s %s %s\n' \
-        "${PR_NUMBERS[i]}" "$(color_pad "$status_icon" 1)" "$(color_pad "$status_label" 8)" "$(color_pad "$ci_ic" 2)" "$(color_pad "$merge_lbl" 9)" "$(color_pad "$review_lbl" 9)" "$title_short"
-      DASHBOARD_CURRENT_RENDER_LINES=$(( DASHBOARD_CURRENT_RENDER_LINES + 1 ))
+      # Unresolved threads
+      local unresolved="${PR_UNRESOLVED_THREADS[i]:-0}"
+      local unresolved_lbl
+      if (( unresolved > 0 )); then
+        unresolved_lbl="${C_BOLD_YELLOW}${unresolved}${C_RESET}"
+      else
+        unresolved_lbl="${C_DIM}0${C_RESET}"
+      fi
+
+      # Reviewers: combine who reviewed + who is requested
+      local reviewer_display=""
+      local reviewed="${PR_LATEST_REVIEWERS[i]:-}"
+      local requested="${PR_REQUESTED_REVIEWERS[i]:-}"
+      if [[ -n "$reviewed" ]]; then
+        reviewer_display="$reviewed"
+      fi
+      if [[ -n "$requested" ]]; then
+        if [[ -n "$reviewer_display" ]]; then
+          reviewer_display="${reviewer_display},${requested}"
+        else
+          reviewer_display="$requested"
+        fi
+      fi
+      # Deduplicate and format as short names
+      local reviewer_short=""
+      if [[ -n "$reviewer_display" ]]; then
+        local IFS=','
+        local seen_names="" login short
+        for login in $reviewer_display; do
+          # Skip duplicates
+          case ",$seen_names," in *",$login,"*) continue ;; esac
+          seen_names="${seen_names:+${seen_names},}${login}"
+          if [[ "$login" == copilot* ]]; then
+            short="copilot"
+          else
+            short="${login%%-*}"
+            short="${short%%_*}"
+            short="${short%%.*}"
+          fi
+          if [[ -n "$reviewer_short" ]]; then
+            reviewer_short="${reviewer_short}, ${short}"
+          else
+            reviewer_short="$short"
+          fi
+        done
+      fi
+      reviewer_short="${reviewer_short:--}"
+      reviewer_short="$(truncate_text "$reviewer_short" 20)"
+
+      print_dashboard_linef ' %-5s %s %s  %s %s %s %s %s %s' \
+        "${PR_NUMBERS[i]}" "$(color_pad "$status_icon" 1)" "$(color_pad "$status_label" 8)" \
+        "$(color_pad "$ci_ic" 2)" "$(color_pad "$merge_lbl" 9)" "$(color_pad "$review_lbl" 9)" \
+        "$(color_pad "$unresolved_lbl" 5)" "$(color_pad "$reviewer_short" 20)" "$title_short"
     done
   fi
 
